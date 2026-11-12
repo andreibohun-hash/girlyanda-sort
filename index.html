@@ -1,0 +1,1303 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Гирлянда: сортировка</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#070914">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="icon" href="data:,">
+<style>
+/* Шрифт файлом (§1): Nunito, латиница + кириллица. */
+@font-face{font-family:Nunito;font-weight:200 1000;font-display:swap;src:url('assets/nunito-latin.woff2') format('woff2');
+  unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:Nunito;font-weight:200 1000;font-display:swap;src:url('assets/nunito-cyr.woff2') format('woff2');
+  unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
+/* Палитра — одно место; canvas читает цвета через getComputedStyle (PROTO-BASE §9).
+   Сцена тёмная в обеих темах: всё внимание на лампы и свет; светлая тема меняет только подложку вокруг кадра. */
+:root{
+  --bg:#03040a; --frame:#070914; --ink:#fff8ec; --muted:#b9b6cc; --ink-dark:#3a2410;
+  --accent:#ffcf33; --accent2:#ff9a3c; --danger:#ff6b6b;
+  /* цвета свечения ламп = цвета спрайтов bulb-on-*: красный, синий, зелёный, жёлтый, фиолетовый, тёплый белый */
+  --c0:#ff4f5e; --c1:#3fb8ff; --c2:#57d977; --c3:#ffcf33; --c4:#b77bff; --c5:#ffe9c4;
+  --warm:#fff1c2;
+  --sky1:#0b0f24; --sky2:#04050c;            /* фон: вертикальный градиент, без деталей */
+  --wire:#2a5a40; --wire-hi:#6fae82; --wire-gold:#ffd772; --socket:#3b4258;
+  --glass:#aebcff; --glass-fill:#141a33;
+  --card1:#241d44; --card2:#131029;
+  --frame-w:440px;
+}
+@media (prefers-color-scheme: light){ :root{ --bg:#15172a; } }
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:16px/1.3 Nunito, system-ui, sans-serif;font-weight:700;
+  overflow:hidden;overscroll-behavior:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
+#frame{position:relative;width:min(100vw,var(--frame-w));height:100dvh;height:100svh;margin:0 auto;background:var(--frame);overflow:hidden}
+#game{position:absolute;inset:0;touch-action:none}
+#game canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+header{position:absolute;left:0;right:0;top:0;display:flex;align-items:center;gap:7px;padding:calc(8px + env(safe-area-inset-top)) 10px 0;pointer-events:none;z-index:3}
+header .pill{background:rgba(16,18,40,.7);border:1.5px solid rgba(255,255,255,.14);border-radius:999px;padding:6px 13px;font-weight:900;font-size:15px;letter-spacing:.01em;white-space:nowrap}
+header .pill.dim{color:var(--muted);font-weight:800}
+header .sp{flex:1}
+.ib{pointer-events:auto;width:40px;height:40px;border-radius:50%;padding:0;display:grid;place-items:center;background:rgba(16,18,40,.7);border:1.5px solid rgba(255,255,255,.16)}
+.ib svg{width:22px;height:22px;fill:none;stroke:var(--ink);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.ib.off .wave{display:none} .ib:not(.off) .mutex{display:none}
+.ib:active{transform:scale(.92)}
+@media (max-width: 410px){ header{gap:5px;padding-left:8px;padding-right:8px} header .pill{padding:6px 10px;font-size:13.5px} .ib{width:36px;height:36px} .ib svg{width:20px;height:20px} #hud-moves .lbl{display:none} }
+footer{position:absolute;left:0;right:0;bottom:0;display:flex;gap:10px;justify-content:center;padding:0 12px calc(12px + env(safe-area-inset-bottom));pointer-events:none;z-index:3}
+footer button{pointer-events:auto;background:rgba(22,24,52,.86);border:1.5px solid rgba(255,255,255,.16);border-radius:999px;padding:10px 18px;font-size:15px;display:flex;align-items:center;gap:7px}
+footer button svg{width:18px;height:18px;fill:none;stroke:var(--ink);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+footer button[disabled]{opacity:.35}
+footer button:active{transform:scale(.95)}
+button{font:inherit;font-weight:900;color:var(--ink);background:#2f2859;border:0;border-radius:16px;padding:11px 18px;cursor:pointer}
+button.primary{background:linear-gradient(#ffe066,#ffb22e);color:var(--ink-dark);box-shadow:0 4px 0 #b86e12, 0 8px 18px rgba(255,170,40,.35)}
+button.primary:active{transform:translateY(3px);box-shadow:0 1px 0 #b86e12}
+button.big{font-size:20px;padding:14px 34px;border-radius:20px}
+#overlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 40%,rgba(8,8,24,.3),rgba(2,2,10,.8));padding:22px;z-index:5}
+#overlay.show{display:flex}
+.card{background:linear-gradient(var(--card1),var(--card2));border:2px solid rgba(255,214,120,.32);border-radius:26px;padding:22px 20px;max-width:340px;width:100%;text-align:center;
+  box-shadow:0 0 0 6px rgba(255,214,120,.05),0 20px 50px rgba(0,0,0,.55);animation:pop .28s cubic-bezier(.2,1.4,.4,1)} /* стартует с видимого состояния (§9) */
+@keyframes pop{from{transform:scale(.9)}to{transform:scale(1)}}
+.card h2{margin:0 0 6px;font-size:27px;font-weight:1000;color:var(--accent);text-shadow:0 2px 0 #6b3a08}
+.card p{color:var(--muted);margin:0 0 14px;font-weight:700}
+.logo{font-size:38px;font-weight:1000;line-height:1.02;margin:2px 0 4px;background:linear-gradient(90deg,#ff4f5e,#ffcf33,#57d977,#3fb8ff,#b77bff);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 3px 0 rgba(0,0,0,.45))}
+.sub{font-size:15px;color:var(--muted);margin:0 0 12px;font-weight:800;letter-spacing:.02em}
+.card .row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+/* переключатель вариантов A/B */
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:#17132f;border-radius:18px;padding:5px;margin:0 0 14px}
+.seg button{padding:9px 4px 8px;border-radius:14px;background:transparent;color:var(--muted);font-size:15px;line-height:1.15}
+.seg button small{display:block;font-size:11px;font-weight:800;opacity:.85}
+.seg button.on{background:#3a2f6c;color:var(--ink);box-shadow:inset 0 0 0 2px rgba(255,214,120,.45)}
+.levels{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin:14px 0 4px}
+.levels button{padding:8px 0 6px;font-size:17px;border-radius:14px;background:#3a2f6c;display:flex;flex-direction:column;align-items:center;line-height:1.1;min-height:44px;justify-content:center}
+.levels button small{font-size:10px;line-height:10px;height:10px;display:block}
+.dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--accent);margin:0 1px}
+.levels button.locked{opacity:.32}
+.levels button.cur{outline:2.5px solid var(--accent)}
+/* замок — CSS-формой, не глифом (глиф вне шрифта = кадр 1 с) */
+.lock{width:12px;height:10px;border-radius:2px;background:var(--muted);position:relative;margin-top:7px}
+.lock:before{content:"";position:absolute;left:2px;top:-7px;width:8px;height:8px;border:2px solid var(--muted);border-bottom:0;border-radius:5px 5px 0 0;box-sizing:border-box}
+.cheat{margin-top:8px;font-size:12px;padding:6px 10px;background:transparent;border:1.5px dashed var(--muted);color:var(--muted);border-radius:12px}
+.stars{display:flex;gap:8px;justify-content:center;margin:6px 0 12px}
+.star{width:52px;height:52px;background:#40376c;clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)}
+.star.on{background:linear-gradient(#fff2a8,#ffcf33 55%,#ff9a3c);animation:starIn .5s cubic-bezier(.2,1.6,.4,1) both;animation-delay:var(--d)}
+.stars .star:nth-child(2){transform:translateY(-8px)}
+@keyframes starIn{from{transform:scale(1.6) rotate(-20deg)}to{transform:scale(1)}}
+.stars .star.on:nth-child(2){animation-name:starIn2}
+@keyframes starIn2{from{transform:translateY(-8px) scale(1.6) rotate(-20deg)}to{transform:translateY(-8px) scale(1)}}
+.how{text-align:left;color:var(--muted);margin:0 0 16px;padding-left:20px;font-weight:700} .how li{margin:6px 0} .how b{color:var(--ink)}
+#toast{position:absolute;left:50%;top:calc(60px + env(safe-area-inset-top));transform:translateX(-50%);background:rgba(255,248,230,.96);color:var(--ink-dark);padding:9px 16px;border-radius:14px;
+  pointer-events:none;opacity:.98;transition:opacity .25s;white-space:nowrap;z-index:4;font-weight:900;font-size:14px}
+#toast.hide{opacity:0}
+@media (prefers-reduced-motion: reduce){ .card,.star.on{animation:none} #toast{transition:none} }
+</style>
+</head>
+<body>
+<div id="frame">
+  <div id="game"><canvas id="cv"></canvas></div>
+  <header>
+    <span class="pill" id="hud-level">Уровень 1</span><span class="pill dim" id="hud-moves"><span class="lbl">ходы </span><span id="hud-moves-n">0</span></span><span class="sp"></span>
+    <button class="ib" id="btn-hint" aria-label="подсказка"><svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z"/></svg></button>
+    <button class="ib" id="btn-reset" aria-label="заново"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4.5h4.5"/></svg></button>
+    <button class="ib" id="btn-mute" aria-label="звук"><svg viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="wave" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/><path class="mutex" d="M16 9.5l5 5M21 9.5l-5 5"/></svg></button>
+    <button class="ib" id="btn-menu" aria-label="меню"><svg viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h14"/></svg></button>
+  </header>
+  <footer>
+    <button id="btn-undo"><svg viewBox="0 0 24 24"><path d="M9 7L4 12l5 5M4 12h10a6 6 0 0 1 0 12"/></svg>Отмена</button>
+    <button id="btn-spare"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span id="spare-label">провод</span></button>
+  </footer>
+  <div id="overlay"><div class="card" id="card"></div></div>
+  <div id="toast" class="hide"></div>
+</div>
+<script>
+'use strict';
+/* ЯДРО */
+// ---------------------------------------------------------------------------
+// «Гирлянда: сортировка» — сортировка лампочек, два варианта правил (RULES):
+//   a «Провода» — как Bird Sort: лампы висят на проводах, крайняя у свободного конца — «верхняя».
+//       Ход: с провода снимается вся крайняя группа ламп одного цвета и перелетает на другой провод,
+//       если он пуст или его крайняя лампа того же цвета; влезает столько, сколько есть места.
+//       Провод, на котором собрались все лампы цвета (и только они), загорается и гирлянда улетает — провод свободен.
+//   b «Колбы» — классическая сортировка шариков: лампы стопкой в колбах, за ход переносится одна верхняя лампа
+//       на пустую колбу или на лампу того же цвета. Собранная колба загорается и запирается (остаётся на месте).
+// Провод/колба = «контейнер»: строка цифр-цветов от закреплённого конца (дна) к свободному, caps[i] — вместимость.
+// Победа — собраны все цвета. Проигрыша нет: тупик лечится отменой, запасным контейнером (бустер) или рестартом.
+// Контракт для sim.mjs/test.mjs: CFG, RULES, LEVELS, mulberry32, createState, legalMoves, applyMove, undoMove,
+// addSpare, isWin, isStuck, solveInfo, solve, hintMove, starsFor, randomRun, noviceRun.
+// ---------------------------------------------------------------------------
+const CFG = {
+  // --- правила ---
+  START_MAX_RUN: 2,       // на старте в контейнере подряд не больше стольких ламп одного цвета (тройка — почти готовый цвет даром)
+  SPARE_PER_LEVEL: 1,     // сколько запасных контейнеров можно добавить за уровень (бустер «+ провод / + колба»)
+  STAR3_K: 1.3,           // 3 звезды: ходов ≤ par × STAR3_K (par — минимум солвера, записан в LEVELS)
+  STAR2_K: 1.8,           // 2 звезды: ходов ≤ par × STAR2_K
+  // --- солвер и боты ---
+  SOLVE_NODES: 500000,    // лимит узлов A* в симуляторе (точный par)
+  HINT_NODES: 30000,      // лимит узлов для подсказки в игре (взвешенный A*, быстро и не обязательно кратчайше)
+  HINT_WEIGHT: 2,         // вес эвристики для подсказки
+  BOT_MOVE_CAP: 160,      // бот сдаётся после стольких ходов
+  // --- раскладка, виртуальные юниты при ширине кадра 400 ---
+  VW: 400,                // виртуальная ширина кадра
+  BULB_R: 14,             // «радиус» лампы: высота спрайта = R × BULB_H_K
+  BULB_H_K: 3.1,          // высота спрайта лампы в радиусах
+  BULB_HOOK_K: 0.12,      // доля высоты спрайта над точкой подвеса (цоколь заходит на провод)
+  A_TOP: 122,             // вариант a: верх поля (под итоговой гирляндой), от верха кадра
+  A_BOTTOM: 74,           // вариант a: отступ поля от низа кадра (кнопки)
+  A_ROW_MIN: 66, A_ROW_MAX: 104,  // высота ряда проводов
+  A_WALL: 20,             // отступ первой лампы от стены
+  A_STEP: 40, A_STEP5: 33,        // шаг ламп на проводе при вместимости ≤4 и 5
+  A_SAG: 5,               // провис провода
+  A_LIFT: 14,             // на сколько приподнимаются выбранные лампы
+  TOP_Y: 78,              // итоговая гирлянда сверху: высота подвеса
+  TOP_SAG: 16,            // её провис
+  TOP_SCALE: 0.56,        // масштаб ламп на итоговой гирлянде
+  B_TOP: 112, B_BOTTOM: 78,       // вариант b: поле
+  B_TUBE_W: 40,           // внутренняя ширина колбы
+  B_SLOT: 37,             // шаг ламп в колбе по высоте
+  B_GAP: 26,              // зазор между колбами
+  B_LIFT: 6,              // зазор между горлышком и приподнятой лампой
+  B_BULB_R: 13.5,         // «радиус» лампы в колбе
+  B_ROW_GAP: 58,          // зазор между рядами колб (место под приподнятую лампу)
+  HIT_PAD: 12,            // запас зоны попадания вокруг контейнера
+  DRAG_PX: 10,            // порог тап/драг, CSS px
+  // --- свет ---
+  LIT_SINGLE: 0.0,        // яркость одиночной лампы (0 — спрайт «не горит», цвет читается)
+  LIT_PAIR: 0.62,         // яркость группы из двух одинаковых
+  GLOW_K: 8.5,            // диаметр свечения в радиусах лампы
+  GLOW_A: 0.7,            // сила свечения при полной яркости
+  AMBIENT: 0.16,          // слабое свечение негорящей лампы (чтобы цвет читался на тёмном)
+  // --- тайминги оболочки, мс (абсолютное время, §4) ---
+  FLY_MS: 300,            // перелёт лампы
+  FLY_STAGGER_MS: 85,     // задержка между лампами группы
+  FLY_ARC: 54,            // высота дуги перелёта
+  KISS_MS: 420,           // «поцелуй» совпавших ламп
+  SWING_MS: 900,          // качание после посадки
+  LIT_MS: 260,            // разгорание/затухание
+  WAVE_STEP_MS: 85,       // волна по собранному контейнеру: шаг на лампу
+  DONE_HOLD_MS: 420,      // пауза после волны перед уходом гирлянды / крышкой
+  LEAVE_MS: 520,          // полёт лампы на итоговую гирлянду
+  LEAVE_STAGGER_MS: 60,
+  CAP_MS: 260,            // крышка садится на колбу
+  WIN_WAVE_MS: 1100,      // финальная волна перед карточкой победы
+  HINT_IDLE_MS: 1400,     // через сколько без ввода показывается рука на 1-м уровне
+  HINT_SHOW_MS: 5200,     // сколько висит подсказка по кнопке
+  BAD_MS: 320,            // тряска при неверном ходе
+  TOAST_MS: 1700,         // сколько висит тост
+};
+
+// Детерминированный генератор случайных чисел (PROTO-BASE §5). Math.random() не используется.
+function mulberry32(seed){
+  let a = seed >>> 0;
+  return function(){
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// Правила вариантов: group — ход переносит всю крайнюю группу одного цвета; leave — собранный контейнер освобождается.
+const RULES = {
+  a: { key: 'a', title: 'Провода', hint: 'как Bird Sort', unit: 'провод', group: true, leave: true },
+  b: { key: 'b', title: 'Колбы', hint: 'классика, по одной', unit: 'колба', group: false, leave: false },
+};
+
+// Контент — декларативные таблицы. Уровень: colors × per ламп; caps — вместимости контейнеров; fill — сколько ламп
+// в каждом на старте (сумма = colors × per); seed — раздача (подобрана `node sim.mjs seeds`); par — минимум ходов
+// (солвер; `~` в симе, если не доказан); win — цель: доля побед бота-новичка без отмены (для подбора сида).
+// Нарастание — формой, а не размером: короткий запасной провод, поле без пустого провода, вместимость «с запасом».
+const LEVELS = {
+  a: [
+    { n: 1,  colors: 2, per: 3, caps: [3, 3, 3],                fill: [3, 3, 0],                seed: 3, par: 3, win: 1.0,  note: 'два цвета, один пустой провод' },
+    { n: 2,  colors: 3, per: 3, caps: [3, 3, 3, 3, 3],          fill: [3, 3, 3, 0, 0],          seed: 3, par: 5, win: 0.95, note: 'три цвета, два пустых провода' },
+    { n: 3,  colors: 3, per: 4, caps: [4, 4, 4, 4, 4],          fill: [4, 4, 4, 0, 0],          seed: 18, par: 8, win: 0.95, note: 'по четыре лампы, два пустых' },
+    { n: 4,  colors: 4, per: 4, caps: [4, 4, 4, 4, 4, 4],       fill: [4, 4, 4, 4, 0, 0],       seed: 13, par: 12, win: 0.9,  note: 'четыре цвета' },
+    { n: 5,  colors: 4, per: 4, caps: [4, 4, 4, 4, 4, 2],       fill: [4, 4, 4, 4, 0, 0],       seed: 129, par: 10, win: 0.8,  note: 'форма: второй пустой провод — короткий, на две лампы' },
+    { n: 6,  colors: 5, per: 4, caps: [4, 4, 4, 4, 4, 4, 4],    fill: [4, 4, 4, 4, 4, 0, 0],    seed: 36, par: 14, win: 0.8,  note: 'пять цветов' },
+    { n: 7,  colors: 5, per: 4, caps: [4, 4, 4, 4, 4, 4],       fill: [4, 4, 3, 3, 3, 3],       seed: 183, par: 13, win: 0.7,  note: 'форма: пустого провода нет, свободные места рассыпаны' },
+    { n: 8,  colors: 5, per: 5, caps: [5, 5, 5, 5, 5, 5, 3],    fill: [5, 5, 5, 5, 5, 0, 0],    seed: 93, par: 20, win: 0.7,  note: 'по пять ламп; запасной провод — на три' },
+    { n: 9,  colors: 6, per: 4, caps: [4, 4, 4, 4, 4, 4, 4, 4], fill: [4, 4, 4, 4, 4, 4, 0, 0], seed: 6, par: 20, win: 0.65, note: 'шесть цветов' },
+    { n: 10, colors: 6, per: 4, caps: [4, 4, 4, 4, 4, 4, 4, 2], fill: [4, 4, 4, 4, 4, 4, 0, 0], seed: 12, par: 15, win: 0.55, note: 'шесть цветов и короткий запасной' },
+  ],
+  b: [
+    { n: 1,  colors: 2, per: 3, caps: [3, 3, 3],                fill: [3, 3, 0],                seed: 20, par: 3, win: 1.0,  note: 'два цвета, одна пустая колба' },
+    { n: 2,  colors: 3, per: 3, caps: [3, 3, 3, 3, 3],          fill: [3, 3, 3, 0, 0],          seed: 4, par: 5, win: 0.95, note: 'три цвета' },
+    { n: 3,  colors: 3, per: 4, caps: [4, 4, 4, 4, 4],          fill: [4, 4, 4, 0, 0],          seed: 38, par: 10, win: 0.95, note: 'по четыре лампы' },
+    { n: 4,  colors: 4, per: 4, caps: [4, 4, 4, 4, 4, 4],       fill: [4, 4, 4, 4, 0, 0],       seed: 78, par: 15, win: 0.9,  note: 'четыре цвета' },
+    { n: 5,  colors: 4, per: 4, caps: [5, 5, 5, 5, 5],          fill: [4, 4, 4, 4, 0],          seed: 177, par: 16, win: 0.8,  note: 'форма: высокие колбы с запасом в одну лампу, пустая одна' },
+    { n: 6,  colors: 5, per: 4, caps: [4, 4, 4, 4, 4, 4, 4],    fill: [4, 4, 4, 4, 4, 0, 0],    seed: 66, par: 16, win: 0.8,  note: 'пять цветов' },
+    { n: 7,  colors: 5, per: 4, caps: [4, 4, 4, 4, 4, 4, 2],    fill: [4, 4, 4, 4, 4, 0, 0],    seed: 116, par: 19, win: 0.7,  note: 'форма: вторая пустая колба — короткая, на две лампы' },
+    { n: 8,  colors: 5, per: 4, caps: [5, 5, 5, 5, 5, 5],       fill: [4, 4, 4, 3, 3, 2],       seed: 66, par: 18, win: 0.7,  note: 'форма: пустой колбы нет, высокие колбы заполнены неровно' },
+    { n: 9,  colors: 6, per: 4, caps: [4, 4, 4, 4, 4, 4, 4, 4], fill: [4, 4, 4, 4, 4, 4, 0, 0], seed: 115, par: 24, win: 0.65, note: 'шесть цветов' },
+    { n: 10, colors: 6, per: 4, caps: [4, 4, 4, 4, 4, 4, 4, 2], fill: [4, 4, 4, 4, 4, 4, 0, 0], seed: 74, par: 19, win: 0.55, note: 'шесть цветов и короткая запасная' },
+  ],
+};
+
+// --- чистые функции над контейнерами (их исполняют и игра, и солвер, и боты) ---
+function isUniform(t){ for (let i = 1; i < t.length; i++) if (t[i] !== t[0]) return false; return true; }
+function isComplete(t, per){ return t.length === per && isUniform(t); }             // все лампы цвета вместе и одни
+function maxRun(t){ let best = 0, n = 0; for (let i = 0; i < t.length; i++){ n = i && t[i] === t[i - 1] ? n + 1 : 1; if (n > best) best = n; } return best; }   // самая длинная группа подряд
+function topRun(t){                                                                 // длина крайней группы одного цвета
+  if (!t.length) return 0;
+  let n = 1; const c = t[t.length - 1];
+  while (n < t.length && t[t.length - 1 - n] === c) n++;
+  return n;
+}
+// Сколько ламп перелетит ходом a → b (0 — ход невозможен).
+function moveSize(T, caps, per, R, a, b){
+  if (a === b) return 0;
+  const A = T[a], B = T[b];
+  if (A === undefined || B === undefined || !A.length) return 0;
+  if (!R.leave && (isComplete(A, per) || isComplete(B, per))) return 0;             // запертая колба
+  const space = caps[b] - B.length;
+  if (space <= 0) return 0;
+  if (B.length && B[B.length - 1] !== A[A.length - 1]) return 0;
+  return R.group ? Math.min(topRun(A), space) : 1;
+}
+// Осмысленные ходы: без переноса одноцветного контейнера на пустой не большей вместимости (ничего не меняет)
+// и без дублей среди одинаковых пустых контейнеров.
+function movesOf(T, caps, per, R){
+  const out = [];
+  for (let a = 0; a < T.length; a++){
+    if (!T[a].length) continue;
+    const uni = isUniform(T[a]), seenEmpty = {};
+    for (let b = 0; b < T.length; b++){
+      const n = moveSize(T, caps, per, R, a, b);
+      if (!n) continue;
+      if (!T[b].length){
+        if (uni && caps[b] <= caps[a]) continue;
+        if (seenEmpty[caps[b]]) continue;
+        seenEmpty[caps[b]] = 1;
+      }
+      out.push({ a, b, n });
+    }
+  }
+  return out;
+}
+function moveTubes(T, per, R, m){
+  const T2 = T.slice(), A = T[m.a];
+  T2[m.a] = A.slice(0, A.length - m.n);
+  T2[m.b] = T[m.b] + A.slice(A.length - m.n);
+  if (R.leave && isComplete(T2[m.b], per)) T2[m.b] = '';
+  return T2;
+}
+function tubesKey(T, caps){ const a = new Array(T.length); for (let i = 0; i < T.length; i++) a[i] = caps[i] + ':' + T[i]; a.sort(); return a.join('|'); }
+
+// --- состояние ---
+function dealLevel(L){
+  const rnd = mulberry32(L.seed);
+  for (let attempt = 0; attempt < 80; attempt++){            // детерминировано: rnd идёт дальше по тому же сиду
+    const bag = [];
+    for (let c = 0; c < L.colors; c++) for (let k = 0; k < L.per; k++) bag.push(c);
+    for (let i = bag.length - 1; i > 0; i--){ const j = Math.floor(rnd() * (i + 1)); const x = bag[i]; bag[i] = bag[j]; bag[j] = x; }
+    const T = []; let p = 0;
+    for (let i = 0; i < L.caps.length; i++){ T.push(bag.slice(p, p + L.fill[i]).join('')); p += L.fill[i]; }
+    if (T.some(t => isComplete(t, L.per))) continue;         // на старте ничего не собрано
+    if (T.some(t => maxRun(t) >= CFG.START_MAX_RUN + 1)) continue;   // и нет почти собранных: подряд не больше пары
+    return T;
+  }
+  throw new Error('раздача не получилась: уровень ' + L.n);
+}
+function createState(levelIndex, variant){
+  const v = variant || 'a', L = LEVELS[v][levelIndex];
+  return { v, li: levelIndex, colors: L.colors, per: L.per, caps: L.caps.slice(), tubes: dealLevel(L), done: [], moves: 0, spare: 0, hist: [], last: null };
+}
+function legalMoves(s){ return movesOf(s.tubes, s.caps, s.per, RULES[s.v]); }
+function canMove(s, a, b){ return moveSize(s.tubes, s.caps, s.per, RULES[s.v], a, b); }
+function snapshot(s){ return { tubes: s.tubes, caps: s.caps, done: s.done, spare: s.spare, moves: s.moves }; }
+function applyMove(s, m){
+  const R = RULES[s.v], n = moveSize(s.tubes, s.caps, s.per, R, m.a, m.b);
+  if (!n) return s;
+  const T = s.tubes.slice(), A = T[m.a], col = +A[A.length - 1];
+  T[m.a] = A.slice(0, A.length - n);
+  T[m.b] = T[m.b] + A.slice(A.length - n);
+  const done = s.done.slice(); let completed = false;
+  if (isComplete(T[m.b], s.per)){ completed = true; done.push(col); if (R.leave) T[m.b] = ''; }
+  return Object.assign({}, s, { tubes: T, done, moves: s.moves + 1, hist: s.hist.concat([snapshot(s)]), last: { a: m.a, b: m.b, n, col, completed, merge: s.tubes[m.b].length > 0 } });
+}
+function undoMove(s){
+  if (!s.hist.length) return s;
+  const h = s.hist[s.hist.length - 1];
+  return Object.assign({}, s, h, { hist: s.hist.slice(0, -1), last: null });
+}
+// Бустер: запасной пустой контейнер полной вместимости. Ходом не считается, отменяется как ход.
+function addSpare(s){
+  if (s.spare >= CFG.SPARE_PER_LEVEL) return s;
+  return Object.assign({}, s, { caps: s.caps.concat([s.per]), tubes: s.tubes.concat(['']), spare: s.spare + 1, hist: s.hist.concat([snapshot(s)]), last: null });
+}
+function isWin(s){ return s.done.length === s.colors; }
+function isStuck(s){ return !isWin(s) && legalMoves(s).length === 0; }                // осмысленных ходов нет
+function starsFor(moves, par){ return !par || moves <= Math.ceil(par * CFG.STAR3_K) ? 3 : moves <= Math.ceil(par * CFG.STAR2_K) ? 2 : 1; }
+
+// --- солвер: A* по каноническим состояниям (порядок одинаковых контейнеров не важен) ---
+// Эвристика допустимая: каждая группа (в «колбах» — каждая лампа), лежащая поверх чужого цвета, обязана сдвинуться
+// хотя бы раз; донные группы одного цвета в k контейнерах — все, кроме одной, тоже.
+function heuristic(T, R){
+  let h = 0; const bottoms = {};
+  for (let q = 0; q < T.length; q++){
+    const t = T[q]; if (!t.length) continue;
+    let i = 1; while (i < t.length && t[i] === t[0]) i++;
+    (bottoms[t[0]] || (bottoms[t[0]] = [])).push(i);
+    if (R.group){ for (let j = i; j < t.length; j++) if (j === i || t[j] !== t[j - 1]) h++; }
+    else h += t.length - i;
+  }
+  for (const c in bottoms){
+    const b = bottoms[c]; if (b.length < 2) continue;
+    if (R.group) h += b.length - 1;
+    else { let sum = 0, max = 0; for (const x of b){ sum += x; if (x > max) max = x; } h += sum - max; }
+  }
+  return h;
+}
+// Возвращает { path: [{a,b,n}] | null, complete: дошёл ли поиск до конца (false — упёрся в лимит узлов), nodes }.
+// weight = 1 — кратчайшее решение; больше — быстрее, но длиннее.
+function solveInfo(s, opt){
+  const o = opt || {}, R = RULES[s.v], per = s.per, caps = s.caps, limit = o.nodes || CFG.SOLVE_NODES, w = o.weight || 1;
+  const h0 = heuristic(s.tubes, R);
+  if (h0 === 0) return { path: [], complete: true, nodes: 0 };
+  const nodes = [{ T: s.tubes, g: 0, p: -1, m: null, k: tubesKey(s.tubes, caps), h: h0 }];
+  const best = new Map([[nodes[0].k, 0]]);
+  const buckets = [];
+  const push = (f, idx) => { (buckets[f] || (buckets[f] = [])).push(idx); };
+  push(Math.round(w * h0), 0);
+  let fmin = 0, expanded = 0;
+  for (;;){
+    while (fmin < buckets.length && (!buckets[fmin] || !buckets[fmin].length)) fmin++;
+    if (fmin >= buckets.length) return { path: null, complete: true, nodes: expanded };
+    const idx = buckets[fmin].pop(), nd = nodes[idx];
+    if (best.get(nd.k) < nd.g) continue;
+    if (nd.h === 0){
+      const path = []; let at = idx;
+      while (nodes[at].p >= 0){ path.push(nodes[at].m); at = nodes[at].p; }
+      return { path: path.reverse(), complete: true, nodes: expanded };
+    }
+    if (++expanded > limit) return { path: null, complete: false, nodes: expanded };
+    const ms = movesOf(nd.T, caps, per, R);
+    for (let i = 0; i < ms.length; i++){
+      const T2 = moveTubes(nd.T, per, R, ms[i]), k = tubesKey(T2, caps), g2 = nd.g + 1, b = best.get(k);
+      if (b !== undefined && b <= g2) continue;
+      best.set(k, g2);
+      const h = heuristic(T2, R);
+      nodes.push({ T: T2, g: g2, p: idx, m: ms[i], k, h });
+      const f = g2 + Math.round(w * h);
+      push(f, nodes.length - 1);
+      if (f < fmin) fmin = f;
+    }
+  }
+}
+function solve(s, opt){ return solveInfo(s, opt).path; }
+// Подсказка: { move, dead } — следующий ход быстрого солвера; dead = отсюда точно не собрать.
+function hintMove(s){
+  const r = solveInfo(s, { nodes: CFG.HINT_NODES, weight: CFG.HINT_WEIGHT });
+  if (r.path && r.path.length) return { move: r.path[0], dead: false };
+  if (!r.path && !r.complete){ const ms = legalMoves(s); return { move: ms.find(m => s.tubes[m.b].length) || ms[0] || null, dead: false }; }   // не досчитал — хотя бы слияние
+  return { move: null, dead: !r.path };
+}
+
+// --- боты для симулятора (PROTO-BASE §6): случайный и новичок (жадный без отмены и без счёта вперёд) ---
+function botRun(s0, seed, pick, noRepeat){
+  const rnd = mulberry32(seed); let s = s0, prev = null, firstDone = 0, merges = 0;
+  const seen = new Set([tubesKey(s.tubes, s.caps)]);
+  while (!isWin(s) && s.moves < CFG.BOT_MOVE_CAP){
+    let ms = legalMoves(s).filter(m => !(prev && m.a === prev.b && m.b === prev.a));
+    if (noRepeat) ms = ms.filter(m => !seen.has(tubesKey(moveTubes(s.tubes, s.per, RULES[s.v], m), s.caps)));
+    if (!ms.length) break;
+    const m = pick(s, ms, rnd);
+    if (s.tubes[m.b].length) merges++;
+    s = applyMove(s, m); seen.add(tubesKey(s.tubes, s.caps)); prev = m;
+    if (!firstDone && s.done.length) firstDone = s.moves;
+  }
+  return { win: isWin(s), moves: s.moves, firstDone, merges };
+}
+function pickRandom(s, ms, rnd){ return ms[Math.floor(rnd() * ms.length)]; }
+// Новичок: собрать цвет > прицепить к своему цвету > занять пустой контейнер (лучше, если откроется нужная лампа).
+function pickNovice(s, ms, rnd){
+  const R = RULES[s.v], T = s.tubes; let best = null, bestSc = -1;
+  for (const m of ms){
+    const A = T[m.a], B = T[m.b]; let sc;
+    if (isComplete(B + A.slice(A.length - m.n), s.per)) sc = 100;
+    else if (B.length) sc = (!R.group || m.n === topRun(A) ? 50 : 30) + topRun(B) * 4 + (m.n === A.length ? 6 : 0);
+    else {
+      sc = 10 + (m.n > 1 ? 3 : 0);
+      const below = A[A.length - 1 - m.n];
+      if (below !== undefined && T.some((t, i) => i !== m.a && t.length && t[t.length - 1] === below && s.caps[i] > t.length)) sc += 8;
+    }
+    sc += rnd() * 6;
+    if (sc > bestSc){ bestSc = sc; best = m; }
+  }
+  return best;
+}
+function randomRun(levelIndex, variant, seed){ return botRun(createState(levelIndex, variant), seed, pickRandom, false); }
+function noviceRun(levelIndex, variant, seed){ return botRun(createState(levelIndex, variant), seed, pickNovice, true); }
+/* КОНЕЦ ЯДРА */
+
+// ---------------------------------------------------------------------------
+// Оболочка: экраны, ввод, рендер, звук, сейв, дебаг-хук. Время абсолютное (§4):
+// все анимации — функции от now(); события (посадка лампы, волна, уход гирлянды) — очередь с дедлайнами.
+// Ядро меняет состояние мгновенно, оболочка доигрывает ход по своей визуальной модели (V).
+// ---------------------------------------------------------------------------
+const NAME = 'girlyanda-sort';
+const T0 = performance.now();
+let clockSkew = 0;                                    // drive() двигает игровые часы вперёд без ожидания
+const now = () => performance.now() + clockSkew;
+function log(kind, name, info){                       // журнал [game] — одна строка на событие (§11)
+  console.log('[game] ' + JSON.stringify({ t: +((now() - T0) / 1000).toFixed(3), kind, name, info: info === undefined ? '' : String(info) }));
+}
+
+const SAVE_KEY = NAME + '.v1';
+function loadSave(){ try { return JSON.parse(localStorage.getItem(SAVE_KEY)) || {}; } catch (e) { return {}; } }
+function save(){ try { localStorage.setItem(SAVE_KEY, JSON.stringify(G.save)); } catch (e) {} }
+const freshSave = () => ({ v: 'a', level: { a: 0, b: 0 }, best: { a: {}, b: {} }, muted: false, unlockAll: false });   // unlockAll — чит (PROTO-BASE §6)
+// Вариант правил: ?v=a | ?v=b в адресе, иначе последний выбранный в меню.
+const QV = (() => { try { const v = new URLSearchParams(location.search).get('v'); return v === 'a' || v === 'b' ? v : null; } catch (e) { return null; } })();
+
+const SPARE = -2;                                     // «контейнер»-призрак: место под запасной провод/колбу
+const G = {
+  v: 'a',                        // вариант, выбранный в меню
+  s: null,                       // состояние ядра
+  screen: 'menu',                // menu | game | help | win | stuck
+  save: null,
+  sel: -1, selN: 0,              // выбранный контейнер и сколько ламп приподнято
+  down: null, drag: null,        // палец: нажатие и перетаскивание
+  events: [],                    // очередь [{ at, fn }] — дедлайны в now()
+  parts: [], rings: [],          // частицы и кольца-волны
+  lockUntil: 0,                  // до какого времени поле не принимает ввод (сбор цвета)
+  ending: 0,                     // когда показать карточку победы, 0 = не ждём
+  hint: null,                    // { a, b, t0, until, auto }
+  idleT: 0,                      // время последнего ввода (для руки на 1-м уровне)
+  bad: null,                     // { ci, t0 } — тряска при неверном ходе
+  winT: -1e9,                    // момент финальной волны
+  fxSeed: 1,
+  timeScale: 1,
+  paused: false,
+};
+(function initSave(){
+  const d = freshSave(), l = loadSave();
+  G.save = Object.assign(d, l, { level: Object.assign(d.level, l.level || {}), best: Object.assign(d.best, l.best || {}) });
+  if (QV) G.save.v = QV;
+  G.v = G.save.v === 'b' ? 'b' : 'a';
+})();
+// Визуальная модель: лампы-объекты по контейнерам (зеркало s.tubes), итоговая гирлянда (вариант a), крышки (вариант b).
+const V = { cont: [], top: [], capT: {}, goldT: {}, bornT: {} };
+const GEO = { cont: [], ghost: -1, r: CFG.BULB_R, rowH: 80, k: 1, slot: CFG.B_SLOT, tw: CFG.B_TUBE_W };
+
+const dur = (ms) => ms / G.timeScale;
+const fxRnd = () => mulberry32(G.fxSeed++ * 7919);
+const clamp01 = (k) => Math.max(0, Math.min(1, k));
+const ease = (k) => 1 - Math.pow(1 - clamp01(k), 3);
+const easeIO = (k) => { k = clamp01(k); return k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2; };
+const easeIn = (k) => { k = clamp01(k); return k * k; };
+// твин: значение a → b за d мс, начиная с t0 (абсолютное время)
+const tw = (a) => ({ a, b: a, t0: 0, d: 1 });
+const twVal = (x, t) => x.a + (x.b - x.a) * ease((t - x.t0) / x.d);
+function twTo(x, b, t, ms){ x.a = twVal(x, t); x.b = b; x.t0 = t; x.d = dur(ms); }
+function after(ms, fn){                              // событие через ms игрового времени
+  const ev = { at: now() + dur(ms), fn }; let i = G.events.length;
+  while (i > 0 && G.events[i - 1].at > ev.at) i--;
+  G.events.splice(i, 0, ev);
+}
+function tick(t){ let guard = 0; while (G.events.length && G.events[0].at <= t && guard++ < 400) G.events.shift().fn(); }
+
+// --- арт: файлы по имени (§11) ---
+const COLOR_NAMES = ['red', 'blue', 'green', 'yellow', 'violet', 'white'];   // шестой — тёплый белый: оранжевый спрайт в негорящем виде путается с жёлтым и красным
+const ART_FILES = COLOR_NAMES.flatMap(c => ['bulb-on-' + c + '.png', 'bulb-off-' + c + '.png']);
+const ART = {};
+function loadArt(){
+  for (const f of ART_FILES){
+    const im = new Image(), name = f.replace(/\.png$/, '');
+    im.onload = () => { ART[name] = im; };
+    im.onerror = () => log('event', 'art.missing', f);
+    im.src = 'assets/' + f;
+  }
+}
+const spr = (name) => ART[name] || null;
+
+// --- звук: WebAudio-синтез без файлов, ленивый старт по первому жесту (§8) ---
+const PENTA = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24, 26, 28];   // пентатоника для лампочек
+const Sound = {
+  ac: null, out: null, wet: null, noise: null,
+  init(){
+    if (this.ac){ if (this.ac.state === 'suspended') this.ac.resume(); return; }
+    try {
+      const ac = this.ac = new (window.AudioContext || window.webkitAudioContext)();
+      const comp = ac.createDynamicsCompressor(); comp.connect(ac.destination);
+      this.out = ac.createGain(); this.out.gain.value = 0.6; this.out.connect(comp);
+      const r = mulberry32(99), n = Math.floor(ac.sampleRate * 0.6), nb = ac.createBuffer(1, n, ac.sampleRate), d = nb.getChannelData(0);
+      for (let i = 0; i < n; i++) d[i] = r() * 2 - 1;
+      this.noise = nb;
+      // реверберация: импульс — затухающий шум 1,6 с (мягкое эхо стеклянных колокольчиков)
+      const L = Math.floor(ac.sampleRate * 1.6), ir = ac.createBuffer(2, L, ac.sampleRate);
+      for (let ch = 0; ch < 2; ch++){ const b = ir.getChannelData(ch); for (let i = 0; i < L; i++) b[i] = (r() * 2 - 1) * Math.pow(1 - i / L, 2.6); }
+      const conv = ac.createConvolver(); conv.buffer = ir;
+      this.wet = ac.createGain(); this.wet.gain.value = 0.3; this.wet.connect(conv); conv.connect(this.out);
+    } catch (e) { this.ac = null; }
+  },
+  ok(){ return this.ac && !G.save.muted; },
+  env(g, t, vol, atk, ms){ g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + atk); g.gain.exponentialRampToValueAtTime(0.0001, t + ms / 1000); },
+  tone(freq, ms, type, vol, at, glideTo, wet){
+    if (!this.ok()) return;
+    const ac = this.ac, t = ac.currentTime + (at || 0), o = ac.createOscillator(), g = ac.createGain();
+    o.type = type || 'sine'; o.frequency.setValueAtTime(freq, t);
+    if (glideTo) o.frequency.exponentialRampToValueAtTime(glideTo, t + ms / 1000);
+    this.env(g, t, vol || 0.2, 0.006, ms);
+    o.connect(g); g.connect(this.out); if (wet) g.connect(this.wet);
+    o.start(t); o.stop(t + ms / 1000 + 0.03);
+  },
+  bell(freq, at, vol){                 // стеклянный колокольчик: основной тон + негармонические обертоны, с эхом
+    this.tone(freq, 900, 'sine', vol, at, 0, true);
+    this.tone(freq * 2.76, 380, 'sine', vol * 0.35, at, 0, true);
+    this.tone(freq * 5.4, 160, 'sine', vol * 0.12, at, 0, true);
+  },
+  hiss(ms, filt, freq, vol, at, q){
+    if (!this.ok()) return;
+    const ac = this.ac, t = ac.currentTime + (at || 0), src = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+    src.buffer = this.noise; f.type = filt; f.frequency.value = freq; if (q) f.Q.value = q;
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + ms / 1000);
+    src.connect(f).connect(g).connect(this.out); src.start(t, (at || 0) % 0.3); src.stop(t + ms / 1000 + 0.02);
+  },
+  note(step){ return 523.25 * Math.pow(2, PENTA[Math.max(0, Math.min(step, PENTA.length - 1))] / 12); },
+  ui(){ this.tone(640, 50, 'triangle', 0.06); log('sound', 'ui'); },
+  pick(){ this.hiss(28, 'bandpass', 2600, 0.16, 0, 3); this.tone(430, 70, 'triangle', 0.07, 0, 580); log('sound', 'pick'); },
+  land(step){ this.hiss(20, 'bandpass', 2200, 0.3, 0, 4); this.tone(150, 80, 'sine', 0.16, 0, 80); this.bell(this.note(step), 0.01, 0.055); log('sound', 'land'); },
+  kiss(size){                          // «поцелуй»: парный аккорд совпавших ламп (чем длиннее группа — тем выше), искра тока, блёстки
+    const b = 1 + size * 2;
+    this.bell(this.note(b), 0.02, 0.1); this.bell(this.note(b + 2), 0.02, 0.075);
+    this.tone(1800, 110, 'sawtooth', 0.02, 0.01, 5000);
+    this.hiss(220, 'highpass', 6000, 0.05, 0.04);
+    log('sound', 'kiss', 'size=' + size);
+  },
+  waveNote(j){ this.bell(this.note(3 + j), 0, 0.09); },
+  complete(){ [0, 4, 7, 12].forEach(s => this.tone(261.63 * Math.pow(2, s / 12), 1300, 'triangle', 0.05, 0, 0, true)); this.hiss(520, 'bandpass', 3200, 0.1, 0, 1.5); log('sound', 'complete'); },
+  leave(){ this.hiss(420, 'highpass', 2500, 0.08); this.tone(480, 380, 'sine', 0.05, 0, 1500); log('sound', 'leave'); },
+  ting(k){ this.bell(this.note(7 + (k % 5)), 0, 0.04); },
+  cap(){ this.tone(220, 120, 'sine', 0.2, 0, 110); this.hiss(40, 'bandpass', 1500, 0.3, 0, 2); this.bell(this.note(9), 0.05, 0.07); log('sound', 'cap'); },
+  bad(){ this.tone(150, 170, 'triangle', 0.2, 0, 105); this.hiss(60, 'lowpass', 500, 0.15); log('sound', 'bad'); },
+  undo(){ this.tone(560, 130, 'triangle', 0.09, 0, 300); log('sound', 'undo'); },
+  spare(){ this.tone(300, 240, 'triangle', 0.09, 0, 900); this.bell(this.note(6), 0.16, 0.06); log('sound', 'spare'); },
+  stuck(){ this.bell(392, 0, 0.07); this.bell(330, 0.22, 0.07); log('sound', 'stuck'); },
+  win(){ [0, 2, 4, 7, 9, 12].forEach((k, i) => this.bell(this.note(k + 1), i * 0.11, 0.09)); [0, 4, 7, 12].forEach(s => this.tone(261.63 * Math.pow(2, s / 12), 1800, 'triangle', 0.045, 0.6, 0, true)); log('sound', 'win'); },
+};
+function buzz(ms){ try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {} }
+
+// --- экраны: DOM-оверлеи, любой открывается кодом или хешем (§6, §11) ---
+const $ = (id) => document.getElementById(id);
+const starsHtml = (n) => '<div class="stars">' + [0, 1, 2].map(k => '<i class="star' + (k < n ? ' on' : '') + '" style="--d:' + (k * 0.18) + 's"></i>').join('') + '</div>';
+const levelsOf = (v) => LEVELS[v];
+// Уровень открыт, если до него дошёл прогресс варианта или включён чит «открыть все уровни» (PROTO-BASE §6).
+function isOpen(li, v){ return G.save.unlockAll || li <= G.save.level[v || G.v]; }
+function setUnlockAll(on){ G.save.unlockAll = !!on; save(); log('event', 'cheat', 'unlockAll=' + G.save.unlockAll); }
+function setVariant(v){ G.v = v === 'b' ? 'b' : 'a'; G.save.v = G.v; save(); log('event', 'variant', G.v); }
+function goto(screen, payload){
+  G.screen = screen; log('screen', screen, G.v);
+  const ov = $('overlay'), card = $('card');
+  if (screen === 'game'){ ov.classList.remove('show'); return; }
+  ov.classList.add('show');
+  const R = RULES[G.v], LV = levelsOf(G.v), cur = Math.min(G.save.level[G.v], LV.length - 1);
+  if (screen === 'menu'){
+    let lv = '';
+    for (let i = 0; i < LV.length; i++){
+      const st = G.save.best[G.v][i] || 0;
+      lv += isOpen(i) ? `<button data-act="lvl" data-li="${i}" class="${i === cur ? 'cur' : ''}">${i + 1}<small>${st ? '<i class="dot"></i>'.repeat(st) : '&nbsp;'}</small></button>`
+                      : `<button data-act="lvl" data-li="${i}" class="locked"><i class="lock"></i></button>`;
+    }
+    card.innerHTML = `<div class="logo">Гирлянда</div><div class="sub">сортировка лампочек</div>
+      <div class="seg">${['a', 'b'].map(v => `<button data-act="var" data-v="${v}" class="${v === G.v ? 'on' : ''}">${RULES[v].title}<small>${RULES[v].hint}</small></button>`).join('')}</div>
+      <button class="primary big" data-act="play">Играть · ${cur + 1}</button>
+      <div class="levels">${lv}</div>
+      <div class="row"><button data-act="help">Как играть</button></div>
+      <div class="row">${G.save.unlockAll ? '<button class="cheat" data-act="relock">Чит включён · закрыть обратно</button>' : '<button class="cheat" data-act="unlock">Чит: открыть все уровни</button>'}
+      <button class="cheat" data-act="wipe">Сбросить прогресс</button></div>`;
+  }
+  if (screen === 'help'){
+    card.innerHTML = G.v === 'a'
+      ? `<h2>Провода</h2><ul class="how"><li>Тапни провод — <b>крайние лампы одного цвета</b> снимутся.</li><li>Тапни другой провод — они перелетят, если он пуст или его крайняя лампа <b>того же цвета</b>.</li>
+         <li>Все лампы цвета на одном проводе — гирлянда <b>загорается и улетает</b> наверх.</li><li>Застрял — «Отмена» или запасной провод.</li></ul><button class="primary" data-act="back">Понятно</button>`
+      : `<h2>Колбы</h2><ul class="how"><li>Тапни колбу — <b>верхняя лампа</b> поднимется.</li><li>Тапни другую колбу — лампа ляжет, если колба пуста или сверху лампа <b>того же цвета</b>.</li>
+         <li>Все лампы цвета в одной колбе — она <b>загорается и закрывается</b>.</li><li>Застрял — «Отмена» или запасная колба.</li></ul><button class="primary" data-act="back">Понятно</button>`;
+  }
+  if (screen === 'win'){
+    const p = payload || demoWin(), last = p.li >= LV.length - 1, other = G.v === 'a' ? 'b' : 'a';
+    card.innerHTML = `<h2>${G.v === 'a' ? 'Гирлянда горит!' : 'Все колбы светятся!'}</h2>${starsHtml(p.stars)}<p>Ходов ${p.moves} · лучший результат ${p.par}</p>
+      <div class="row">${last ? `<button class="primary big" data-act="var-play" data-v="${other}">Попробовать «${RULES[other].title}»</button><button data-act="menu">Меню</button>`
+                               : '<button class="primary big" data-act="next">Дальше</button>'}</div>`;
+  }
+  if (screen === 'stuck'){
+    const can = G.s && G.s.spare < CFG.SPARE_PER_LEVEL;
+    card.innerHTML = `<h2>Ходов нет</h2><p>Лампам некуда лететь. Верни ход${can ? ' или добавь ' + (G.v === 'a' ? 'запасной провод' : 'запасную колбу') : ''}.</p>
+      <div class="row"><button class="primary" data-act="undo">Отменить ход</button>${can ? `<button data-act="spare">+ ${R.unit}</button>` : ''}<button data-act="retry">Заново</button></div>`;
+  }
+}
+function demoWin(){ const li = G.s ? G.s.li : 0, par = levelsOf(G.v)[li].par, moves = G.s ? G.s.moves || par : par; return { li, moves, par, stars: starsFor(moves, par) }; }
+$('card').addEventListener('click', (e) => {
+  const b = e.target && e.target.closest ? e.target.closest('[data-act]') : null; if (!b) return;
+  const act = b.dataset.act;
+  Sound.init(); Sound.ui(); log('input', 'button', act);
+  const LV = levelsOf(G.v);
+  if (act === 'play') startLevel(Math.min(G.save.level[G.v], LV.length - 1));
+  else if (act === 'retry') startLevel(G.s ? G.s.li : 0);
+  else if (act === 'next') startLevel(Math.min((G.s ? G.s.li : -1) + 1, LV.length - 1));
+  else if (act === 'help') goto('help');
+  else if (act === 'back') goto('menu');
+  else if (act === 'var'){ setVariant(b.dataset.v); G.s = null; goto('menu'); }
+  else if (act === 'var-play'){ setVariant(b.dataset.v); startLevel(Math.min(G.save.level[G.v], levelsOf(G.v).length - 1)); }
+  else if (act === 'lvl'){ const li = +b.dataset.li; if (isOpen(li)) startLevel(li); else toast('Сначала пройди уровень ' + (G.save.level[G.v] + 1)); }
+  else if (act === 'unlock' || act === 'relock'){ setUnlockAll(act === 'unlock'); goto('menu'); }
+  else if (act === 'wipe'){ const m = G.save.muted, v = G.v; G.save = freshSave(); G.save.muted = m; G.save.v = v; save(); G.s = null; log('event', 'wipe'); goto('menu'); }
+  else if (act === 'undo'){ goto('game'); undo(); }
+  else if (act === 'spare'){ goto('game'); useSpare(); }
+  else goto('menu');
+});
+function route(h){
+  if (h === 'unlock'){ setUnlockAll(true); goto('menu'); }
+  else if (h === 'game'){ if (!G.s) startLevel(Math.min(G.save.level[G.v], levelsOf(G.v).length - 1)); else goto('game'); }
+  else if (h === 'win' || h === 'stuck'){ if (!G.s) startLevel(Math.min(G.save.level[G.v], levelsOf(G.v).length - 1)); goto(h); }
+  else goto(h === 'help' ? 'help' : 'menu');
+}
+window.addEventListener('hashchange', () => { const h = location.hash.slice(1); if (h && h !== G.screen) route(h); });
+
+let toastUntil = 0;
+function toast(msg){ const t = $('toast'); t.textContent = msg; t.classList.remove('hide'); toastUntil = now() + CFG.TOAST_MS; }
+
+// --- раскладка: всё в виртуальных юнитах при ширине VW (§2) ---
+const cv = $('cv'), ctx = cv.getContext('2d');
+const VW = CFG.VW;
+let scale = 1, W = VW, H = 640, DPR = 1;
+// layout(): места контейнеров. Место под запасной контейнер зарезервировано заранее (призрак) — поле не прыгает.
+function layout(){
+  const s = G.s; if (!s) return;
+  const n = s.caps.length, ghost = s.spare < CFG.SPARE_PER_LEVEL ? 1 : 0, N = n + ghost;
+  const capOf = (i) => i < n ? s.caps[i] : s.per;
+  GEO.cont = []; GEO.ghost = ghost ? n : -1;
+  if (s.v === 'a'){
+    // провода растут от левой и правой стены в шахматном порядке, как ветки
+    const rows = Math.ceil(N / 2), top = CFG.A_TOP, bottom = H - CFG.A_BOTTOM;
+    const rowH = Math.max(CFG.A_ROW_MIN, Math.min(CFG.A_ROW_MAX, (bottom - top) / (rows + 0.5)));
+    const y0 = top + Math.max(0, (bottom - top - (rows + 0.5) * rowH) * 0.4);
+    GEO.r = CFG.BULB_R; GEO.rowH = rowH; GEO.k = 1;
+    for (let i = 0; i < N; i++){
+      const side = i % 2, row = (i - side) / 2, cap = capOf(i), step = cap >= 5 ? CFG.A_STEP5 : CFG.A_STEP;
+      GEO.cont.push({ i, side, dir: side ? -1 : 1, x0: side ? W : 0, y: y0 + rowH * 0.3 + row * rowH + (side ? rowH * 0.5 : 0), cap, step, len: CFG.A_WALL + cap * step + 8 });
+    }
+  } else {
+    // колбы в один или два ряда, донышки по линии; всё поле сжимается коэффициентом k, если не влезает по высоте
+    const perRow = N <= 5 ? N : Math.ceil(N / 2), rows = N <= 5 ? 1 : 2, top = CFG.B_TOP, bottom = H - CFG.B_BOTTOM;
+    let maxCap = 0; for (let i = 0; i < N; i++) maxCap = Math.max(maxCap, capOf(i));
+    const rowBlock = maxCap * CFG.B_SLOT + 16 + CFG.B_ROW_GAP;
+    const k = Math.min(1, (bottom - top) / (rows * rowBlock));
+    const pitch = Math.min((CFG.B_TUBE_W + CFG.B_GAP) * k, (W - 16) / perRow);
+    const y0 = top + Math.max(0, (bottom - top - rows * rowBlock * k) * 0.4);
+    GEO.r = CFG.B_BULB_R * k; GEO.k = k; GEO.slot = CFG.B_SLOT * k; GEO.tw = CFG.B_TUBE_W * k;
+    for (let i = 0; i < N; i++){
+      const row = Math.floor(i / perRow), inRow = row === rows - 1 ? N - perRow * (rows - 1) : perRow, col = i - row * perRow, cap = capOf(i);
+      GEO.cont.push({ i, row, x: W / 2 + (col - (inRow - 1) / 2) * pitch, yBot: y0 + (row + 1) * rowBlock * k - 4 * k, cap, h: cap * GEO.slot + 14 * k });
+    }
+  }
+}
+const bulbH = () => GEO.r * CFG.BULB_H_K;
+function wireY(c, d){ const u = d / c.len; return c.y + 4 * CFG.A_SAG * u * (1 - u); }       // провис провода
+// slotPos: точка подвеса лампы (цоколь) в ячейке si контейнера ci
+function slotPos(ci, si){
+  const c = GEO.cont[ci]; if (!c) return { x: W / 2, y: H / 2 };
+  if (G.s.v === 'a'){ const d = CFG.A_WALL + (si + 0.5) * c.step; return { x: c.x0 + c.dir * d, y: wireY(c, d) }; }
+  return { x: c.x, y: c.yBot - 5 * GEO.k - si * GEO.slot - bulbH() * (1 - CFG.BULB_HOOK_K) };
+}
+// mouthPos: точка подвеса лампы, висящей над горлышком колбы (вариант b)
+function mouthPos(ci){ const c = GEO.cont[ci]; return { x: c.x, y: c.yBot - c.h - CFG.B_LIFT * GEO.k - bulbH() * (1 - CFG.BULB_HOOK_K) }; }
+// topPos: место q на итоговой гирлянде сверху (вариант a)
+function topPos(q){
+  const N = G.s.colors * G.s.per, x = 16 + (q + 0.5) / N * (W - 32), u = x / W;
+  return { x, y: CFG.TOP_Y + 4 * CFG.TOP_SAG * u * (1 - u) };
+}
+// центр контейнера — для подсказки, хука where() и эффектов
+function contCenter(ci){
+  const c = GEO.cont[ci]; if (!c) return { x: W / 2, y: H / 2 };
+  if (G.s.v === 'a') return { x: c.x0 + c.dir * c.len * 0.5, y: c.y + 16 };
+  return { x: c.x, y: c.yBot - c.h / 2 };
+}
+function containerAt(p){
+  if (!G.s) return -1;
+  let best = -1, bd = 1e9;
+  for (const c of GEO.cont){
+    let d;
+    if (G.s.v === 'a'){
+      if ((c.side === 0) !== (p.x < W / 2)) continue;
+      d = Math.abs(p.y - (c.y + 14)); if (d > GEO.rowH * 0.5) continue;
+    } else {
+      d = Math.abs(p.x - c.x); if (d > GEO.tw / 2 + CFG.HIT_PAD + 3) continue;
+      if (p.y < c.yBot - c.h - CFG.B_ROW_GAP * GEO.k * 0.9 || p.y > c.yBot + CFG.HIT_PAD) continue;
+    }
+    if (d < bd){ bd = d; best = c.i; }
+  }
+  return best >= 0 && best === GEO.ghost ? SPARE : best;
+}
+
+// --- визуальная модель ламп ---
+let lampSeq = 0;
+function mkLamp(col, ci, si){
+  return { id: lampSeq++, col, ci, si, top: -1, landed: true, fly: null, flyId: 0, lift: tw(0), lit: tw(0), sc: tw(1),
+    landT: -1e9, landDir: 1, kissT: -1e9, kissDir: 0, flashT: -1e9, flashK: 0, px: 0, py: 0, dragX: null, dragY: null };
+}
+// яркость лампы по длине её группы: одиночная не горит, пара загорается, собранный цвет — в полную силу
+function litLevel(L, per){ return L < 2 ? CFG.LIT_SINGLE : CFG.LIT_PAIR + (1 - CFG.LIT_PAIR) * (L - 2) / Math.max(1, per - 2); }
+function relight(ci, t, instant){
+  const arr = V.cont[ci]; if (!arr) return;
+  let n = 0; while (n < arr.length && arr[n].landed) n++;          // летящие лампы — в хвосте, в группы пока не входят
+  for (let j = 0; j < n;){
+    let e = j; while (e + 1 < n && arr[e + 1].col === arr[j].col) e++;
+    const v = litLevel(e - j + 1, G.s.per);
+    for (let q = j; q <= e; q++){ if (instant) arr[q].lit = tw(v); else if (arr[q].lit.b !== v) twTo(arr[q].lit, v, t, CFG.LIT_MS); }
+    j = e + 1;
+  }
+}
+// syncVisual: собрать визуальную модель заново из состояния ядра (старт уровня, отмена)
+function syncVisual(){
+  const s = G.s, t = now();
+  V.cont = s.tubes.map((str, i) => Array.from(str, (ch, j) => mkLamp(+ch, i, j)));
+  V.top = []; V.capT = {}; V.goldT = {}; V.bornT = {};
+  if (RULES[s.v].leave) s.done.forEach((col, k) => { for (let j = 0; j < s.per; j++){ const l = mkLamp(col, -1, 0); l.top = k * s.per + j; l.lit = tw(1); l.sc = tw(CFG.TOP_SCALE); V.top.push(l); } });
+  else s.tubes.forEach((str, i) => { if (isComplete(str, s.per)) V.capT[i] = -1e9; });
+  layout();
+  for (let i = 0; i < V.cont.length; i++) relight(i, t, true);
+  G.sel = -1; G.selN = 0; G.drag = null; G.down = null; G.events = []; G.lockUntil = 0; G.hint = null; G.bad = null; G.idleT = t;
+}
+function selLamps(){ if (G.sel < 0 || !V.cont[G.sel]) return []; const arr = V.cont[G.sel]; return arr.slice(Math.max(0, arr.length - G.selN)); }
+// lampPose: где лампа сейчас — { x, y, ang, sc }. Всё — функции абсолютного времени.
+function lampPose(l, t){
+  const base = l.top >= 0 ? topPos(l.top) : slotPos(l.ci, l.si), isA = G.s.v === 'a';
+  let x = base.x, y = base.y, ang = 0, sc = twVal(l.sc, t);
+  if (l.fly){
+    let seg = null;
+    for (const sg of l.fly) if (t < sg.t0 + sg.d){ seg = sg; break; }
+    if (!seg) l.fly = null;
+    else {
+      const e = seg.ease((t - seg.t0) / seg.d);
+      x = seg.x0 + (seg.x1 - seg.x0) * e; y = seg.y0 + (seg.y1 - seg.y0) * e - seg.arc * 4 * e * (1 - e);
+      if (isA) ang = (seg.x1 - seg.x0) / 400 * Math.sin(e * Math.PI) * 0.9;     // в полёте лампа отстаёт «хвостом»
+      l.px = x; l.py = y;
+      return { x, y, ang, sc: sc * (1 + 0.12 * Math.sin(e * Math.PI)) };
+    }
+  }
+  const lift = twVal(l.lift, t);
+  if (lift > 0.001){
+    if (isA){ y -= CFG.A_LIFT * lift - Math.sin(t / 260 + l.id) * 1.6 * lift; sc *= 1 + 0.1 * lift; }
+    else if (l.top < 0){ y -= (base.y - mouthPos(l.ci).y) * lift - Math.sin(t / 260) * 1.6 * lift; }
+  }
+  if (G.drag && l.ci === G.sel && l.top < 0 && l.si >= V.cont[l.ci].length - G.selN){     // перетаскивание: группа веером над пальцем
+    const q = l.si - (V.cont[l.ci].length - G.selN), n = G.selN;
+    const tx = G.drag.x + (q - (n - 1) / 2) * GEO.r * 2.1, ty = G.drag.y - bulbH() - 26;
+    l.dragX = l.dragX === null ? x : l.dragX + (tx - l.dragX) * 0.4; l.dragY = l.dragY === null ? y : l.dragY + (ty - l.dragY) * 0.4;
+    x = l.dragX; y = l.dragY; sc *= 1.08;
+  } else if (l.dragX !== null){ l.dragX = l.dragY = null; }
+  const tau = (t - l.landT) / 1000 * G.timeScale;                          // качание после посадки
+  if (tau >= 0 && tau < CFG.SWING_MS / 1000){
+    if (isA) ang -= l.landDir * 0.4 * Math.exp(-4.2 * tau) * Math.sin(tau * 15);
+    else y -= 5 * Math.exp(-7 * tau) * Math.abs(Math.sin(tau * 16));
+  }
+  const kk = (t - l.kissT) / dur(CFG.KISS_MS);                              // «поцелуй»: лампы тянутся друг к другу
+  if (kk >= 0 && kk < 1){
+    const w = Math.sin(kk * Math.PI) * (1 - kk * 0.4);
+    if (isA) ang -= l.kissDir * 0.36 * w; else { y += l.kissDir * 3 * w; }
+    sc *= 1 + 0.13 * w;
+  }
+  if (G.bad && l.ci === G.bad.ci){ const bk = (t - G.bad.t0) / dur(CFG.BAD_MS); if (bk < 1) x += Math.sin(bk * Math.PI * 6) * 4 * (1 - bk); else G.bad = null; }
+  if (isA && l.top < 0) ang += 0.028 * Math.sin(t / 850 + l.id * 1.9);     // лёгкое живое покачивание
+  l.px = x; l.py = y;
+  return { x, y, ang, sc };
+}
+function startFly(l, p0, delayMs, dest, ms){
+  const t0 = now() + dur(delayMs || 0), to = dest || slotPos(l.ci, l.si), d = dur(ms || CFG.FLY_MS);
+  l.lift = tw(0); l.dragX = l.dragY = null; l.landed = false; l.flyId++;
+  if (G.s.v === 'b' && !dest){
+    const m = mouthPos(l.ci), d1 = d * 0.62, d2 = d * 0.38;     // дуга до горлышка, потом падение в колбу
+    l.fly = [{ x0: p0.x, y0: p0.y, x1: m.x, y1: m.y, t0, d: d1, arc: CFG.FLY_ARC * 0.55, ease: easeIO }, { x0: m.x, y0: m.y, x1: to.x, y1: to.y, t0: t0 + d1, d: d2, arc: 0, ease: easeIn }];
+  } else l.fly = [{ x0: p0.x, y0: p0.y, x1: to.x, y1: to.y, t0, d, arc: dest ? 30 : CFG.FLY_ARC, ease: easeIO }];
+  l.landDir = to.x >= p0.x ? 1 : -1;
+  return l.flyId;
+}
+
+// --- частицы и кольца: положение считается от t0 аналитически (абсолютное время, §4) ---
+function burst(x, y, cols, n, speed, opt){
+  const r = fxRnd(), o = opt || {}, t = now();
+  for (let k = 0; k < n; k++){
+    const a = o.up ? -Math.PI / 2 + (r() - 0.5) * (o.spread || 2.2) : r() * Math.PI * 2, v = speed * (0.35 + r() * 0.65);
+    G.parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, g: o.g === undefined ? 380 : o.g, t0: t + dur(o.delay || 0), life: dur((o.life || 700) * (0.6 + r() * 0.5)), col: cols[k % cols.length], size: (o.size || 9) * (0.6 + r() * 0.6) });
+  }
+}
+function ring(x, y, col, r0, r1, ms, lw){ G.rings.push({ x, y, col, r0, r1, t0: now(), d: dur(ms), lw: lw || 3 }); }
+
+// --- уровень и ходы ---
+function startLevel(li, v){
+  if (v) setVariant(v);
+  li = Math.max(0, Math.min(levelsOf(G.v).length - 1, li | 0));
+  G.s = createState(li, G.v); G.parts = []; G.rings = []; G.ending = 0; G.winT = -1e9;
+  syncVisual();
+  log('event', 'level.start', 'v=' + G.v + ' level=' + (li + 1) + ' par=' + levelsOf(G.v)[li].par);
+  goto('game'); hud(); render();
+}
+function hud(){
+  const s = G.s, v = s ? s.v : G.v;
+  $('hud-level').textContent = RULES[v].title + ' · ' + ((s ? s.li : G.save.level[v]) + 1) + '/' + levelsOf(v).length;
+  $('hud-moves-n').textContent = s ? s.moves : 0;
+  $('btn-mute').classList.toggle('off', !!G.save.muted);
+  $('spare-label').textContent = RULES[v].unit;
+  $('btn-spare').disabled = !s || s.spare >= CFG.SPARE_PER_LEVEL;
+  $('btn-undo').disabled = !s || !s.hist.length;
+}
+const canInput = () => G.s && G.screen === 'game' && !G.ending && now() >= G.lockUntil;
+const liftable = (ci) => ci >= 0 && G.s.tubes[ci] && G.s.tubes[ci].length > 0 && !(!RULES[G.s.v].leave && isComplete(G.s.tubes[ci], G.s.per));
+function noteInput(){ G.idleT = now(); if (G.hint && G.hint.auto) G.hint = null; }
+function select(ci, quiet){
+  const t = now();
+  for (const l of selLamps()) twTo(l.lift, 0, t, 140);
+  G.sel = ci; G.selN = 0;
+  if (ci >= 0){
+    G.selN = RULES[G.s.v].group ? topRun(G.s.tubes[ci]) : 1;
+    for (const l of selLamps()) twTo(l.lift, 1, t, 150);
+    if (!quiet) Sound.pick();
+    buzz(8); log('input', 'select', 'c=' + ci + ' n=' + G.selN);
+  }
+}
+function bad(ci){ G.bad = { ci, t0: now() }; Sound.bad(); buzz(30); log('fx.start', 'bad', 'c=' + ci); }
+// Тап по контейнеру: выбрать, снять выбор, перенести или переключить выбор.
+function tapContainer(ci){
+  if (!canInput()) return false;
+  noteInput();
+  if (ci === SPARE){ useSpare(); return true; }
+  if (ci < 0){ if (G.sel >= 0) select(-1); return false; }
+  if (G.sel < 0){ if (liftable(ci)) select(ci); return true; }
+  if (G.sel === ci){ select(-1); return true; }
+  if (canMove(G.s, G.sel, ci)) return doMove(G.sel, ci);
+  bad(ci);
+  if (liftable(ci)) select(ci, true); else select(-1);
+  return false;
+}
+// Ход: ядро меняет состояние сразу, лампы долетают по своей очереди событий.
+function doMove(a, b){
+  if (!canInput()) return false;
+  const s0 = G.s, n = canMove(s0, a, b);
+  if (!n) return false;
+  const t = now(), isA = s0.v === 'a';
+  G.s = applyMove(s0, { a, b });
+  const last = G.s.last, src = V.cont[a], dst = V.cont[b];
+  log('input', 'move', a + '>' + b + ' n=' + n + (last.completed ? ' completed' : ''));
+  G.sel = -1; G.selN = 0; G.hint = null; G.idleT = t;
+  const flyMs = CFG.FLY_MS;
+  for (let k = 0; k < n; k++){
+    const l = src.pop(), p0 = l.dragX !== null ? { x: l.dragX, y: l.dragY } : lampPose(l, t);
+    l.ci = b; l.si = dst.length; dst.push(l);
+    const id = startFly(l, p0, k * CFG.FLY_STAGGER_MS);
+    after(k * CFG.FLY_STAGGER_MS + flyMs, () => { if (l.flyId === id) onLand(l); });
+  }
+  log('fx.start', 'fly', 'n=' + n);
+  relight(a, t);
+  const landAll = (n - 1) * CFG.FLY_STAGGER_MS + flyMs;
+  after(landAll, () => log('fx.end', 'fly'));
+  if (last.completed){
+    G.lockUntil = t + dur(landAll + 60 + s0.per * CFG.WAVE_STEP_MS + CFG.DONE_HOLD_MS + (isA ? 120 : CFG.CAP_MS));
+    if (isWin(G.s)) G.lockUntil = Infinity;
+    after(landAll + 60, () => completeSeq(b, last.col));
+  } else after(landAll + 80, checkStuck);
+  hud();
+  return true;
+}
+function onLand(l){
+  const t = now(), arr = V.cont[l.ci]; if (!arr || arr[l.si] !== l) return;
+  l.landed = true; l.landT = t;
+  const nb = l.si > 0 ? arr[l.si - 1] : null, p = slotPos(l.ci, l.si);
+  let run = 1; for (let q = l.si - 1; q >= 0 && arr[q].col === l.col; q--) run++;
+  Sound.land(Math.min(l.si, 5)); buzz(10);
+  if (nb && nb.col === l.col){                           // сел к своему цвету: «поцелуй», искры, ток по группе
+    const q = slotPos(l.ci, l.si - 1), isA = G.s.v === 'a', hex = colorHex(l.col);
+    l.kissT = nb.kissT = t;
+    if (isA){ l.kissDir = Math.sign(q.x - p.x); nb.kissDir = -l.kissDir; } else { l.kissDir = 1; nb.kissDir = -1; }
+    const mx = (p.x + q.x) / 2, my = (p.y + q.y) / 2 + bulbH() * 0.5;
+    burst(mx, my, [hex, hex, '#ffffff', PAL.warm], 14 + run * 3, 170 + run * 20, { life: 560, size: 8, g: 300 });
+    ring(mx, my, hex, 6, 30 + run * 8, 380, 2.5);
+    for (let k = 0; k < run; k++){ const m = arr[l.si - k]; after(k * 45, () => { m.flashT = now(); m.flashK = 0.55 + 0.15 * run; }); }
+    Sound.kiss(run); buzz([8, 24, 12]);
+    log('fx.start', 'kiss', 'run=' + run);
+    after(CFG.KISS_MS, () => log('fx.end', 'kiss'));
+  }
+  relight(l.ci, t);
+}
+// Цвет собран: волна по лампам с колокольчиками, аккорд, затем гирлянда улетает наверх (a) или колба закрывается (b).
+function completeSeq(ci, col){
+  const arr = V.cont[ci].slice(), per = arr.length, hex = colorHex(col), isA = G.s.v === 'a', c = contCenter(ci);
+  log('fx.start', 'complete', 'c=' + ci + ' color=' + COLOR_NAMES[col]);
+  V.goldT[ci] = now();
+  arr.forEach((l, j) => after(j * CFG.WAVE_STEP_MS, () => {
+    const t = now(); l.flashT = t; l.flashK = 1; twTo(l.lit, 1, t, 120); l.landT = t; l.landDir = j % 2 ? 1 : -1;
+    Sound.waveNote(j); burst(l.px, l.py + bulbH() * 0.5, [hex, '#ffffff'], 6, 150, { life: 420, size: 7, g: 200 });
+  }));
+  after(per * CFG.WAVE_STEP_MS, () => {
+    Sound.complete(); buzz([20, 40, 30]);
+    ring(c.x, c.y, hex, 20, 150, 620, 4); ring(c.x, c.y, '#ffffff', 10, 90, 460, 2);
+    burst(c.x, c.y, [hex, hex, PAL.warm, '#ffffff'], 30, 260, { life: 800, size: 10, g: 260 });
+    arr.forEach(l => { l.flashT = now(); l.flashK = 1; });
+  });
+  after(per * CFG.WAVE_STEP_MS + CFG.DONE_HOLD_MS, () => {
+    if (isA){                                            // гирлянда улетает на итоговый провод сверху
+      const base = V.top.length; V.cont[ci] = []; Sound.leave(); log('fx.start', 'leave');
+      arr.forEach((l, j) => {
+        const p0 = lampPose(l, now()); l.top = base + j; l.ci = -1; V.top.push(l);
+        startFly(l, p0, j * CFG.LEAVE_STAGGER_MS, topPos(l.top), CFG.LEAVE_MS);
+        after(j * CFG.LEAVE_STAGGER_MS, () => twTo(l.sc, CFG.TOP_SCALE, now(), CFG.LEAVE_MS));
+        after(j * CFG.LEAVE_STAGGER_MS + CFG.LEAVE_MS, () => { l.landed = true; l.landT = now(); l.flashT = now(); l.flashK = 0.8; Sound.ting(j); });
+      });
+      after((per - 1) * CFG.LEAVE_STAGGER_MS + CFG.LEAVE_MS, () => { log('fx.end', 'leave'); log('fx.end', 'complete'); afterComplete(); });
+    } else {                                             // колба закрывается крышкой и остаётся светить
+      V.capT[ci] = now(); log('fx.start', 'cap');
+      after(CFG.CAP_MS * 0.7, () => { Sound.cap(); buzz(18); const g = GEO.cont[ci]; if (g) burst(g.x, g.yBot - g.h, [hex, '#ffffff'], 10, 140, { life: 420, size: 6, up: true, spread: 2.6 }); });
+      after(CFG.CAP_MS, () => { log('fx.end', 'cap'); log('fx.end', 'complete'); afterComplete(); });
+    }
+  });
+}
+function afterComplete(){ if (isWin(G.s)) winSeq(); else checkStuck(); }
+function winSeq(){
+  const t = now(), s = G.s, isA = s.v === 'a';
+  log('event', 'level.win', 'v=' + s.v + ' level=' + (s.li + 1) + ' moves=' + s.moves + ' par=' + levelsOf(s.v)[s.li].par);
+  log('fx.start', 'win'); Sound.win(); buzz([30, 50, 30, 50, 60]);
+  G.winT = t;
+  const lamps = isA ? V.top.slice() : [].concat(...V.cont).sort((p, q) => (p.px - q.px) || (q.py - p.py));
+  const span = CFG.WIN_WAVE_MS * 0.42;
+  lamps.forEach((l, q) => { for (let rep = 0; rep < 2; rep++) after(q * span / Math.max(1, lamps.length) + rep * span, () => { l.flashT = now(); l.flashK = 1; l.landT = now(); }); });
+  const cols = s.done.map(colorHex);
+  for (let k = 0; k < 5; k++) after(k * 130, () => burst(W * (0.15 + 0.175 * k), isA ? CFG.TOP_Y + 20 : H * 0.3, cols.concat(['#ffffff']), 22, 300, { life: 1100, size: 10, g: 240 }));
+  G.ending = t + dur(CFG.WIN_WAVE_MS);
+}
+function finishWin(){
+  const s = G.s, v = s.v, li = s.li, par = levelsOf(v)[li].par, stars = starsFor(s.moves, par);
+  G.ending = 0; log('fx.end', 'win');
+  G.save.best[v][li] = Math.max(G.save.best[v][li] || 0, stars);
+  G.save.level[v] = Math.max(G.save.level[v], Math.min(li + 1, levelsOf(v).length - 1)); save();
+  log('event', 'reward', 'stars=' + stars);
+  goto('win', { li, moves: s.moves, par, stars });
+}
+function checkStuck(){
+  if (!G.s || G.screen !== 'game' || isWin(G.s) || !isStuck(G.s)) return;
+  log('event', 'stuck', 'moves=' + G.s.moves);
+  after(450, () => { if (G.s && G.screen === 'game' && isStuck(G.s)){ Sound.stuck(); goto('stuck'); } });
+}
+function undo(){
+  if (!G.s || G.ending || now() < G.lockUntil || !G.s.hist.length) return;
+  G.s = undoMove(G.s); syncVisual(); Sound.undo(); log('input', 'undo', 'moves=' + G.s.moves); hud();
+}
+function useSpare(){
+  if (!G.s || G.ending || now() < G.lockUntil) return;
+  if (G.s.spare >= CFG.SPARE_PER_LEVEL){ toast(G.s.v === 'a' ? 'Запасной провод уже добавлен' : 'Запасная колба уже добавлена'); return; }
+  if (G.sel >= 0) select(-1, true);
+  G.s = addSpare(G.s); V.cont.push([]); layout();
+  const i = V.cont.length - 1, c = contCenter(i);
+  V.bornT[i] = now(); Sound.spare(); buzz(15);
+  ring(c.x, c.y, PAL.warm, 10, 80, 500, 3);
+  log('event', 'spare', 'containers=' + V.cont.length); G.idleT = now(); G.hint = null; hud();
+}
+function showHint(auto){
+  if (!canInput()) return;
+  const h = hintMove(G.s);
+  if (!auto) log('input', 'hint', h.move ? h.move.a + '>' + h.move.b : h.dead ? 'dead' : 'none');
+  if (h.move){ G.hint = { a: h.move.a, b: h.move.b, t0: now(), until: auto ? 0 : now() + dur(CFG.HINT_SHOW_MS), auto: !!auto }; log('fx.start', 'hint'); }
+  else if (!auto) toast(h.dead ? 'Отсюда не собрать — отмени ход' : 'Подсказки нет');
+  else G.idleT = now();
+}
+
+// --- ввод: Pointer Events, порог тап/драг, pointercancel = pointerup (§3) ---
+function toVirtual(e){ const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / scale, y: (e.clientY - r.top) / scale }; }
+cv.addEventListener('pointerdown', (e) => {
+  Sound.init();
+  if (!canInput()) return;
+  const p = toVirtual(e), ci = containerAt(p);
+  G.down = { id: e.pointerId, x: p.x, y: p.y, ci, moved: false, picked: false };
+  try { cv.setPointerCapture(e.pointerId); } catch (err) {}
+  if (ci >= 0 && G.sel < 0 && liftable(ci)){ noteInput(); select(ci); G.down.picked = true; }    // лампы приподнимаются сразу под пальцем
+});
+cv.addEventListener('pointermove', (e) => {
+  const d = G.down; if (!d || e.pointerId !== d.id) return;
+  const p = toVirtual(e);
+  if (!d.moved && Math.hypot(p.x - d.x, p.y - d.y) > CFG.DRAG_PX / scale){ d.moved = true; if (d.picked && G.sel === d.ci){ G.drag = { x: p.x, y: p.y, over: -1 }; log('input', 'drag.start', 'c=' + d.ci); } }
+  if (G.drag){ G.drag.x = p.x; G.drag.y = p.y; const o = containerAt(p); G.drag.over = o >= 0 && o !== G.sel && canMove(G.s, G.sel, o) ? o : -1; }
+});
+function onUp(e){
+  const d = G.down; if (!d || e.pointerId !== d.id) return;
+  G.down = null;
+  const p = toVirtual(e), cancel = e.type === 'pointercancel';
+  if (G.drag){                                            // отпустили группу: над подходящим контейнером — ход, иначе назад
+    const from = G.sel, to = cancel ? -1 : containerAt(p);
+    const lamps = selLamps(), t = now();
+    G.drag = null;
+    if (to >= 0 && to !== from && canMove(G.s, from, to)){ doMove(from, to); return; }
+    if (to >= 0 && to !== from) bad(to);
+    for (const l of lamps){ const p0 = { x: l.px, y: l.py }; const id = startFly(l, p0, 0); l.fly.length = 1; l.fly[0].x1 = slotPos(l.ci, l.si).x; l.fly[0].y1 = slotPos(l.ci, l.si).y; l.fly[0].d = dur(200); l.fly[0].arc = 0;
+      after(200, () => { if (l.flyId === id) l.landed = true; }); }
+    G.sel = -1; G.selN = 0; log('input', 'drag.cancel');
+    return;
+  }
+  if (cancel) return;
+  if (d.picked) return;                                   // первый тап уже приподнял лампы на нажатии
+  tapContainer(d.ci);
+}
+cv.addEventListener('pointerup', onUp); cv.addEventListener('pointercancel', onUp);
+document.addEventListener('keydown', (e) => {          // дубли на клавиатуру для отладки (§3)
+  if (e.key >= '1' && e.key <= '9' && G.s){ const i = +e.key - 1; if (i < V.cont.length) tapContainer(i); }
+  if (e.key === 'z' || e.key === 'u') undo();
+  if (e.key === 'r' && G.s) startLevel(G.s.li);
+  if (e.key === 'm') goto('menu');
+  if (e.key === 'h') showHint();
+  if (e.key === '+' || e.key === '=') useSpare();
+});
+$('btn-undo').onclick = () => { Sound.init(); undo(); };
+$('btn-spare').onclick = () => { Sound.init(); log('input', 'button', 'spare'); useSpare(); };
+$('btn-hint').onclick = () => { Sound.init(); Sound.ui(); showHint(); };
+$('btn-reset').onclick = () => { Sound.init(); Sound.ui(); log('input', 'button', 'reset'); if (G.s) startLevel(G.s.li); };
+$('btn-menu').onclick = () => { Sound.init(); Sound.ui(); log('input', 'button', 'menu'); goto('menu'); };
+$('btn-mute').onclick = () => { G.save.muted = !G.save.muted; save(); hud(); Sound.init(); Sound.ui(); log('input', 'button', 'mute=' + G.save.muted); };
+
+// --- размер: resize + orientationchange + периодический пересчёт (§2) ---
+function fit(){
+  const r = $('game').getBoundingClientRect(); if (!r.width || !r.height) return;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2), w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+  DPR = dpr; scale = r.width / VW; W = VW; H = r.height / scale;
+  if (cv.width !== w || cv.height !== h){ cv.width = w; cv.height = h; layout(); }
+}
+let fitTimer = 0;
+const refit = () => { clearTimeout(fitTimer); fitTimer = setTimeout(fit, 140); };
+window.addEventListener('resize', refit); window.addEventListener('orientationchange', refit);
+setInterval(fit, 800);
+document.addEventListener('visibilitychange', () => { G.paused = document.hidden; log('event', G.paused ? 'pause' : 'resume'); });
+
+// --- рендер: всё в canvas, цвета из CSS-переменных (§9) ---
+const PAL = {};
+function readPalette(){ const cs = getComputedStyle(document.documentElement); for (const k of ['c0', 'c1', 'c2', 'c3', 'c4', 'c5', 'warm', 'sky1', 'sky2', 'wire', 'wire-hi', 'wire-gold', 'socket', 'glass', 'glass-fill', 'accent', 'ink', 'muted']) PAL[k] = cs.getPropertyValue('--' + k).trim(); }
+const colorHex = (k) => PAL['c' + k];
+const GLOW = {};
+// glowSprite(color): заранее отрисованное радиальное свечение 64×64; рисуется через 'lighter'
+function glowSprite(color){
+  if (GLOW[color]) return GLOW[color];
+  const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+  const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, color); gr.addColorStop(0.22, color + 'aa'); gr.addColorStop(0.55, color + '33'); gr.addColorStop(1, color + '00');
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return (GLOW[color] = c);
+}
+function glow(c, color, x, y, s, a){ if (a <= 0.003) return; c.globalCompositeOperation = 'lighter'; c.globalAlpha = Math.min(1, a); c.drawImage(glowSprite(color), x - s / 2, y - s / 2, s, s); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over'; }
+// drawBackground: тёмный вертикальный градиент и едва заметный свет по центру — без деталей
+function drawBackground(c){
+  const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, PAL.sky1); g.addColorStop(1, PAL.sky2);
+  c.fillStyle = g; c.fillRect(0, 0, W, H);
+  glow(c, '#2a3470', W / 2, H * 0.42, W * 2.1, 0.22);
+}
+// drawBulbGlow: свечение лампы; lit 0..1 — яркость, flash — вспышка «поцелуя»/волны
+function drawBulbGlow(c, q){
+  const r = GEO.r * q.sc, cx = q.x - Math.sin(q.ang) * r * 1.6, cy = q.y + Math.cos(q.ang) * r * 1.6, hex = colorHex(q.l.col);
+  glow(c, hex, cx, cy, r * CFG.GLOW_K * (0.7 + 0.3 * q.lit + 0.35 * q.flash), CFG.AMBIENT + (CFG.GLOW_A - CFG.AMBIENT) * q.lit + 0.45 * q.flash);
+}
+// drawBulb: лампочка, висящая цоколем вверх в точке (x, y), повёрнута на ang вокруг подвеса; спрайты bulb-off/bulb-on с перекрёстным переходом
+function drawBulb(c, q){
+  const r = GEO.r, name = COLOR_NAMES[q.l.col], off = spr('bulb-off-' + name), on = spr('bulb-on-' + name), h = r * CFG.BULB_H_K;
+  const onA = clamp01((q.lit - 0.12) / 0.4);
+  c.save(); c.translate(q.x, q.y); c.rotate(q.ang); c.scale(q.sc, q.sc);
+  if (off && on){
+    const w = h * on.width / on.height;
+    if (onA < 1) c.drawImage(off, -w / 2, -h * CFG.BULB_HOOK_K, w, h);
+    if (onA > 0){ c.globalAlpha = onA; c.drawImage(on, -w / 2, -h * CFG.BULB_HOOK_K, w, h); c.globalAlpha = 1; }
+  } else {                                                // запасной вариант кодом, пока спрайт не загрузился
+    c.fillStyle = colorHex(q.l.col); c.globalAlpha = 0.55 + 0.45 * onA; c.beginPath(); c.ellipse(0, h * 0.5, r * 0.8, h * 0.36, 0, 0, Math.PI * 2); c.fill(); c.globalAlpha = 1;
+    c.fillStyle = PAL.socket; c.fillRect(-r * 0.45, -h * 0.1, r * 0.9, h * 0.22);
+  }
+  if (q.flash > 0.01) glow(c, '#ffffff', 0, h * 0.5, r * 5.5, 0.75 * q.flash);
+  c.restore();
+}
+// drawWire: провод варианта a — от стены к свободному концу, с провисом, патронами под лампы и «током» при сборе цвета
+function drawWire(c, g, t, ghost){
+  const x1 = g.x0, x2 = g.x0 + g.dir * g.len, born = V.bornT[g.i] === undefined ? 1 : ease((t - V.bornT[g.i]) / dur(420));
+  const xe = x1 + (x2 - x1) * born, mx = (x1 + xe) / 2, my = g.y + 2 * CFG.A_SAG * born;
+  c.lineCap = 'round';
+  if (ghost){
+    c.save(); c.globalAlpha = 0.34 + 0.1 * Math.sin(t / 500); c.setLineDash([5, 7]); c.strokeStyle = PAL.muted; c.lineWidth = 2;
+    c.beginPath(); c.moveTo(x1, g.y); c.quadraticCurveTo(mx, my, xe, g.y); c.stroke(); c.setLineDash([]);
+    const px = g.x0 + g.dir * g.len * 0.5, py = g.y + 22;
+    c.lineWidth = 2; c.beginPath(); c.arc(px, py, 12, 0, Math.PI * 2); c.stroke();
+    c.lineWidth = 2.6; c.beginPath(); c.moveTo(px - 6, py); c.lineTo(px + 6, py); c.moveTo(px, py - 6); c.lineTo(px, py + 6); c.stroke();
+    c.restore(); return;
+  }
+  const sel = G.sel === g.i, over = G.drag && G.drag.over === g.i;
+  c.fillStyle = PAL.socket; c.beginPath(); c.roundRect(g.side ? W - 6 : 0, g.y - 9, 6, 18, 3); c.fill();        // скоба на стене
+  c.strokeStyle = PAL.wire; c.lineWidth = 3.4; c.beginPath(); c.moveTo(x1, g.y); c.quadraticCurveTo(mx, my, xe, g.y); c.stroke();
+  c.strokeStyle = PAL['wire-hi']; c.lineWidth = sel || over ? 1.8 : 1.1; c.globalAlpha = sel || over ? 1 : 0.8; c.beginPath(); c.moveTo(x1, g.y - 0.7); c.quadraticCurveTo(mx, my - 0.7, xe, g.y - 0.7); c.stroke(); c.globalAlpha = 1;
+  const gold = V.goldT[g.i] === undefined ? 0 : Math.max(0, 1 - (t - V.goldT[g.i]) / dur(1100));
+  if (gold > 0){ c.globalCompositeOperation = 'lighter'; c.globalAlpha = gold; c.strokeStyle = PAL['wire-gold']; c.lineWidth = 3 + 3 * gold; c.beginPath(); c.moveTo(x1, g.y); c.quadraticCurveTo(mx, my, xe, g.y); c.stroke(); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over'; }
+  if (born < 1) return;
+  const used = V.cont[g.i] ? V.cont[g.i].length : 0;
+  for (let j = used; j < g.cap; j++){ const p = slotPos(g.i, j); c.fillStyle = PAL.socket; c.beginPath(); c.roundRect(p.x - 3.5, p.y - 2, 7, 6.5, 2); c.fill(); }   // пустые патроны
+  c.fillStyle = PAL['wire-hi']; c.beginPath(); c.arc(x2, g.y, 3.2, 0, Math.PI * 2); c.fill();                    // свободный конец
+}
+// drawTopWire: итоговая гирлянда сверху (вариант a) — сюда улетают собранные цвета
+function drawTopWire(c){
+  const N = G.s.colors * G.s.per;
+  c.lineCap = 'round'; c.strokeStyle = PAL.wire; c.lineWidth = 2.6;
+  c.beginPath(); c.moveTo(0, CFG.TOP_Y); c.quadraticCurveTo(W / 2, CFG.TOP_Y + 2 * CFG.TOP_SAG, W, CFG.TOP_Y); c.stroke();
+  c.fillStyle = PAL.socket;
+  for (let q = V.top.length; q < N; q++){ const p = topPos(q); c.beginPath(); c.arc(p.x, p.y + 0.5, 2.2, 0, Math.PI * 2); c.fill(); }
+}
+// drawTube: колба варианта b — стекло, блик; собранная светится цветом и закрыта крышкой
+function drawTube(c, g, t, ghost){
+  const w = GEO.tw, x0 = g.x - w / 2, yTop = g.yBot - g.h, r = w / 2, k = GEO.k;
+  const path = () => { c.beginPath(); c.moveTo(x0, yTop); c.lineTo(x0, g.yBot - r); c.arc(g.x, g.yBot - r, r, Math.PI, 0, true); c.lineTo(x0 + w, yTop); };
+  c.lineCap = 'round';
+  if (ghost){
+    c.save(); c.globalAlpha = 0.34 + 0.1 * Math.sin(t / 500); c.setLineDash([5, 7]); c.strokeStyle = PAL.muted; c.lineWidth = 2; path(); c.stroke(); c.setLineDash([]);
+    const py = g.yBot - g.h / 2; c.lineWidth = 2.6; c.beginPath(); c.moveTo(g.x - 7, py); c.lineTo(g.x + 7, py); c.moveTo(g.x, py - 7); c.lineTo(g.x, py + 7); c.stroke();
+    c.restore(); return;
+  }
+  const born = V.bornT[g.i] === undefined ? 1 : ease((t - V.bornT[g.i]) / dur(420));
+  const done = V.capT[g.i] !== undefined, sel = G.sel === g.i, over = G.drag && G.drag.over === g.i;
+  c.save(); c.globalAlpha = born;
+  path(); c.fillStyle = PAL['glass-fill']; c.globalAlpha = 0.6 * born; c.fill();
+  if (done && V.cont[g.i] && V.cont[g.i][0]){
+    const hex = colorHex(V.cont[g.i][0].col), a = ease((t - V.capT[g.i]) / dur(500));
+    path(); c.fillStyle = hex; c.globalAlpha = 0.16 * a; c.fill();
+    c.globalAlpha = 1; glow(c, hex, g.x, g.yBot - g.h / 2, g.h * 1.5, 0.3 * a);
+  }
+  c.globalAlpha = (sel || over ? 0.95 : 0.5) * born; c.strokeStyle = PAL.glass; c.lineWidth = sel || over ? 2.6 : 2; path(); c.stroke();
+  c.lineWidth = 3; c.beginPath(); c.moveTo(x0 - 3 * k, yTop); c.lineTo(x0 + 1, yTop); c.moveTo(x0 + w - 1, yTop); c.lineTo(x0 + w + 3 * k, yTop); c.stroke();      // губы горлышка
+  c.restore();
+}
+// drawTubeFront: блик на стекле и крышка — поверх ламп
+function drawTubeFront(c, g, t){
+  const w = GEO.tw, x0 = g.x - w / 2, yTop = g.yBot - g.h, k = GEO.k;
+  c.lineCap = 'round'; c.strokeStyle = '#ffffff'; c.globalAlpha = 0.13; c.lineWidth = 2.6 * k;
+  c.beginPath(); c.moveTo(x0 + 5 * k, yTop + 10 * k); c.lineTo(x0 + 5 * k, g.yBot - w / 2 - 2); c.stroke(); c.globalAlpha = 1;
+  if (V.capT[g.i] !== undefined){
+    const a = ease((t - V.capT[g.i]) / dur(CFG.CAP_MS)), y = yTop - 5 * k - (1 - a) * 46;
+    c.fillStyle = '#c9cfe6'; c.beginPath(); c.roundRect(x0 - 5 * k, y - 4 * k, w + 10 * k, 9 * k, 4 * k); c.fill();
+    c.fillStyle = '#8891b3'; c.beginPath(); c.roundRect(x0 - 5 * k, y + 1.5 * k, w + 10 * k, 3.5 * k, 2 * k); c.fill();
+    c.fillStyle = '#ffffff'; c.globalAlpha = 0.5; c.fillRect(x0, y - 2.5 * k, w * 0.4, 1.6 * k); c.globalAlpha = 1;
+  }
+}
+function drawRings(c, t){
+  G.rings = G.rings.filter(r => t < r.t0 + r.d);
+  c.globalCompositeOperation = 'lighter';
+  for (const r of G.rings){ const k = (t - r.t0) / r.d, e = ease(k); c.globalAlpha = (1 - k) * 0.8; c.strokeStyle = r.col; c.lineWidth = r.lw * (1 - k * 0.6); c.beginPath(); c.arc(r.x, r.y, r.r0 + (r.r1 - r.r0) * e, 0, Math.PI * 2); c.stroke(); }
+  c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
+}
+function drawParticles(c, t){
+  G.parts = G.parts.filter(p => t < p.t0 + p.life);
+  c.globalCompositeOperation = 'lighter';
+  for (const p of G.parts){ if (t < p.t0) continue; const d = (t - p.t0) / 1000 * G.timeScale, k = (t - p.t0) / p.life;
+    const x = p.x + p.vx * d, y = p.y + p.vy * d + 0.5 * p.g * d * d, s = p.size * (1 - k * 0.6);
+    c.globalAlpha = 1 - k; c.drawImage(glowSprite(p.col), x - s * 1.5, y - s * 1.5, s * 3, s * 3);
+    c.fillStyle = '#ffffff'; c.globalAlpha = (1 - k) * 0.8; c.fillRect(x - 1, y - 1, 2, 2); }
+  c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
+}
+// drawTouch: метка касания (кружок с кольцом) — рука-подсказка без спрайта
+function drawTouch(c, x, y, a, press){
+  c.save(); c.globalAlpha = a; c.fillStyle = 'rgba(255,255,255,.9)'; c.beginPath(); c.arc(x, y, 9 - 2 * press, 0, Math.PI * 2); c.fill();
+  c.strokeStyle = 'rgba(255,255,255,.7)'; c.lineWidth = 2.5; c.beginPath(); c.arc(x, y, 15 + 7 * press, 0, Math.PI * 2); c.globalAlpha = a * (1 - press * 0.7); c.stroke(); c.restore();
+}
+// drawHint: откуда и куда — кольца на контейнерах и бегущая метка касания
+function drawHint(c, t){
+  const h = G.hint; if (!h) return;
+  if (h.until && t > h.until){ G.hint = null; log('fx.end', 'hint'); return; }
+  if (!V.cont[h.a] || !V.cont[h.b] || !V.cont[h.a].length){ G.hint = null; return; }
+  const sa = slotPos(h.a, V.cont[h.a].length - 1), sb = slotPos(h.b, V.cont[h.b].length), off = bulbH() * 0.55;
+  const A = { x: sa.x, y: sa.y + off }, B = { x: sb.x, y: sb.y + off }, ph = ((t - h.t0) / dur(1700)) % 1, pulse = 0.5 + 0.5 * Math.sin(t / 170);
+  c.save(); c.globalCompositeOperation = 'lighter'; c.strokeStyle = PAL.accent; c.lineWidth = 2.5;
+  c.globalAlpha = 0.5 + 0.4 * pulse; c.beginPath(); c.arc(B.x, B.y, GEO.r * 1.5 + 2 * pulse, 0, Math.PI * 2); c.stroke();
+  if (G.sel !== h.a){ c.globalAlpha = 0.35 + 0.3 * pulse; c.beginPath(); c.arc(A.x, A.y, GEO.r * 1.5 + 2 * pulse, 0, Math.PI * 2); c.stroke(); }
+  c.restore();
+  if (G.sel === h.a){ drawTouch(c, B.x, B.y + 8, 0.9, pulse); return; }
+  if (ph < 0.28) drawTouch(c, A.x, A.y + 8, 0.9, Math.sin(ph / 0.28 * Math.PI));
+  else if (ph < 0.72){ const k = easeIO((ph - 0.28) / 0.44); drawTouch(c, A.x + (B.x - A.x) * k, A.y + (B.y - A.y) * k - 40 * Math.sin(k * Math.PI) + 8, 0.75, 0); }
+  else drawTouch(c, B.x, B.y + 8, 0.9, Math.sin((ph - 0.72) / 0.28 * Math.PI));
+}
+// drawCoach: одна строка подсказки на первом уровне (без попапов)
+function coachText(){
+  const s = G.s; if (!s || s.li !== 0 || G.ending || isWin(s)) return '';
+  const a = s.v === 'a';
+  if (!s.done.length && s.moves === 0) return G.sel < 0 ? (a ? 'Тапни провод — крайние лампы снимутся' : 'Тапни колбу — верхняя лампа поднимется') : (a ? 'Теперь тапни провод, куда им лететь' : 'Теперь тапни колбу, куда её положить');
+  if (!s.done.length) return a ? 'Собери цвет на одном проводе — он загорится' : 'Собери цвет в одной колбе — она загорится';
+  return '';
+}
+function drawCoach(c, t){
+  const txt = coachText(); if (!txt) return;
+  c.save(); c.font = '800 16px Nunito, system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+  const y = H - (G.s.v === 'a' ? CFG.A_BOTTOM : CFG.B_BOTTOM) - 26;
+  c.globalAlpha = 0.9; c.fillStyle = PAL.warm; c.fillText(txt, W / 2, y); c.restore();
+}
+
+function render(){
+  const t = now();
+  tick(t);
+  ctx.setTransform(DPR * scale, 0, 0, DPR * scale, 0, 0);
+  drawBackground(ctx);
+  if (toastUntil && t > toastUntil){ $('toast').classList.add('hide'); toastUntil = 0; }
+  const s = G.s; if (!s) return;
+  const isA = s.v === 'a';
+  if (s.li === 0 && !G.hint && canInput() && t - G.idleT > dur(CFG.HINT_IDLE_MS) && !s.done.length) showHint(true);   // рука на первом уровне
+  // 1. контейнеры
+  if (isA){ drawTopWire(ctx); for (const g of GEO.cont) drawWire(ctx, g, t, g.i === GEO.ghost); }
+  else for (const g of GEO.cont) drawTube(ctx, g, t, g.i === GEO.ghost);
+  // 2. лампы: позы → свечение → спрайты (стоящие, потом летящие и приподнятые)
+  const poses = [];
+  const add = (l) => { const p = lampPose(l, t), lf = twVal(l.lift, t); p.l = l; p.lit = Math.max(twVal(l.lit, t), lf * 0.9, l.fly && l.top < 0 ? 0.9 : 0); p.flash = Math.max(0, 1 - (t - l.flashT) / dur(380)) * l.flashK; p.front = !!l.fly || lf > 0.05; poses.push(p); };
+  for (const arr of V.cont) for (const l of arr) add(l);
+  for (const l of V.top) add(l);
+  for (const q of poses) drawBulbGlow(ctx, q);
+  for (const q of poses) if (!q.front) drawBulb(ctx, q);
+  if (!isA) for (const g of GEO.cont) if (g.i !== GEO.ghost) drawTubeFront(ctx, g, t);
+  for (const q of poses) if (q.front) drawBulb(ctx, q);
+  // 3. эффекты и подсказки
+  drawRings(ctx, t); drawParticles(ctx, t); drawHint(ctx, t); drawCoach(ctx, t);
+  if (G.ending && t >= G.ending) finishWin();
+}
+
+// --- цикл: rAF + watchdog setInterval; безопасно, потому что время абсолютное (§4) ---
+let lastFrame = 0;
+function frame(){ lastFrame = performance.now(); if (!G.paused) render(); requestAnimationFrame(frame); }
+setInterval(() => { if (performance.now() - lastFrame > 120 && !G.paused) render(); }, 40);
+
+// --- дебаг-хук (§6): состояние, любой экран, прогон времени, автоигра ---
+window.GIRLYANDA_SORT = {
+  G, V, GEO, CFG,
+  state(){
+    const s = G.s; if (!s) return { screen: G.screen, variant: G.v };
+    return { screen: G.screen, variant: s.v, level: s.li + 1, tubes: s.tubes.slice(), caps: s.caps.slice(), done: s.done.slice(), moves: s.moves, par: levelsOf(s.v)[s.li].par,
+      spare: s.spare, sel: G.sel, win: isWin(s), stuck: isStuck(s), locked: now() < G.lockUntil, legal: legalMoves(s).length };
+  },
+  play(n, v){ startLevel(Math.max(1, n || 1) - 1, v); return this.state(); },
+  variant(v){ setVariant(v); G.s = null; goto('menu'); return G.v; },
+  tap(i){ tapContainer(i); return this.state(); },
+  move(a, b){ if (G.sel >= 0) select(-1, true); const ok = doMove(a, b); return Object.assign({ ok }, this.state()); },
+  undo(){ undo(); return this.state(); },
+  spare(){ useSpare(); return this.state(); },
+  hint(){ showHint(); return G.hint ? { a: G.hint.a, b: G.hint.b } : null; },
+  solve(){ return G.s ? solve(G.s, { nodes: CFG.HINT_NODES * 4, weight: CFG.HINT_WEIGHT }) : null; },
+  // auto(ms): автоигра по подсказкам солвера, по ходу раз в ms игрового времени
+  auto(ms){
+    const step = () => { if (!G.s || G.screen !== 'game' || isWin(G.s)) return; if (!canInput()){ after(80, step); return; }
+      const h = hintMove(G.s); if (!h.move) return; if (G.sel >= 0) select(-1, true); doMove(h.move.a, h.move.b); after(ms || 500, step); };
+    step(); return this.state();
+  },
+  // where(i): экранные координаты (CSS px) центра контейнера i — для проверки касаниями; i = 'spare' — место запасного
+  where(i){
+    const r = cv.getBoundingClientRect(), idx = i === 'spare' ? GEO.ghost : i; if (!G.s || !GEO.cont[idx]) return null;
+    const c = contCenter(idx); return { x: Math.round(r.left + c.x * scale), y: Math.round(r.top + c.y * scale) };
+  },
+  goto(screen){ route(screen); return G.screen; },
+  drive(sec){                                   // ручной прогон игрового времени: rAF заморожен в скрытой вкладке
+    const steps = Math.ceil(sec * 1000 / 16);
+    for (let i = 0; i < steps; i++){ clockSkew += 16; render(); }
+    return this.state();
+  },
+  speed(x){ G.timeScale = x || 1; return G.timeScale; },
+  unlockAll(on){ setUnlockAll(on === undefined ? true : on); if (G.screen === 'menu') goto('menu'); return G.save.unlockAll; },   // чит: открыть все уровни
+  reset(){ try { localStorage.removeItem(SAVE_KEY); } catch (e) {} location.reload(); },
+};
+
+// --- старт ---
+readPalette(); loadArt(); fit(); hud();
+try { if (document.fonts && document.fonts.load) document.fonts.load('800 16px Nunito'); } catch (e) {}
+route(location.hash.slice(1));
+requestAnimationFrame(frame);
+log('event', 'boot', 'variant=' + G.v + ' levels=' + LEVELS.a.length + '+' + LEVELS.b.length);
+</script>
+</body>
+</html>
