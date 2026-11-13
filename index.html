@@ -987,15 +987,18 @@ function mkLamp(v, ci, si){
 // яркость лампы по длине её группы: одиночная не горит, пара загорается, собранный цвет — в полную силу
 function litLevel(L, per){ return L < 2 ? CFG.LIT_SINGLE : CFG.LIT_PAIR + (1 - CFG.LIT_PAIR) * (L - 2) / Math.max(1, per - 2); }
 function relight(ci, t, instant){ relightArr(V.cont[ci], t, instant); }
+// «Ток от розетки» (решение Андрея 13.11, плейтест: «закрытые лампы в центре горят — сбивает»): провод питается от основания
+// (стены или дна), горит только непрерывная цепочка одного цвета от основания до первой чужой лампы — это прогресс укладки.
+// Пары в середине и у свободного конца не горят. Тёмная лампа обрывает цепочку (её цвет не виден).
 function relightArr(arr, t, instant){
   if (!arr) return;
-  let n = 0; while (n < arr.length && arr[n].landed) n++;          // летящие лампы — в хвосте, в группы пока не входят
-  for (let j = 0; j < n;){
-    let e = j; while (e + 1 < n && arr[e + 1].col === arr[j].col && !arr[e + 1].hid && !arr[e].hid) e++;    // тёмная не выдаёт цвет: с соседкой не загорается
-    let v = arr[j].hid ? 0 : litLevel(e - j + 1, perOf(G.s, arr[j].col));
-    if (arr[j].col === WILD && n > 1 && v < CFG.LIT_PAIR) v = CFG.LIT_PAIR;                                  // перламутровая загорается в паре с любой соседкой
-    for (let q = j; q <= e; q++){ if (instant) arr[q].lit = tw(v); else if (arr[q].lit.b !== v) twTo(arr[q].lit, v, t, CFG.LIT_MS); }
-    j = e + 1;
+  let n = 0; while (n < arr.length && arr[n].landed) n++;          // летящие лампы — в хвосте, в цепочку пока не входят
+  let e = -1;
+  if (n > 0 && !arr[0].hid){ e = 0; while (e + 1 < n && !arr[e + 1].hid && arr[e + 1].col === arr[0].col) e++; }
+  const v = e >= 0 ? litLevel(e + 1, perOf(G.s, arr[0].col)) : CFG.LIT_SINGLE;
+  for (let q = 0; q < arr.length; q++){
+    const want = q <= e ? v : CFG.LIT_SINGLE;
+    if (instant) arr[q].lit = tw(want); else if (arr[q].lit.b !== want) twTo(arr[q].lit, want, t, CFG.LIT_MS);
   }
 }
 // syncVisual: собрать визуальную модель заново из состояния ядра (старт уровня, отмена)
