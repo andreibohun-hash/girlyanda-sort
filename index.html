@@ -191,12 +191,14 @@ const CFG = {
   LEAVE_STAGGER_MS: 60,
   CAP_MS: 260,            // крышка садится на колбу
   WIN_WAVE_MS: 1100,      // финальная волна перед карточкой победы
-  HINT_IDLE_MS: 1400,     // через сколько без ввода показывается рука на 1-м уровне
+  HINT_IDLE_MS: 1400,     // через сколько без ввода показывается рука урока (первый уровень, первый шаг урока механики)
+  HAND_SEL_MS: 550,       // то же, когда лампы уже приподняты или игрок упёрся в механику: рука нужна сразу
+  SPARE_FROM_LEVEL: 4,    // с какого уровня виден запасной контейнер (на первых трёх — только то, что нужно для урока; из карточки «Ходов нет» он доступен всегда)
   HINT_SHOW_MS: 5200,     // сколько висит подсказка по кнопке
   BAD_MS: 320,            // тряска при неверном ходе
   TOAST_MS: 1700,         // сколько висит тост
   // --- механики: вид и тайминги ---
-  FROST_A: 0.48,           // плотность инея поверх лампы (цвет под ним читается)
+  FROST_A: 0.62,           // плотность инея поверх лампы; середина стекла у корки почти чистая (frostSprite), цвет под ней читается
   ICE_CAP_W: 2.55,        // ширина снежной шапки с сосульками, в радиусах лампы
   THAW_MS: 560,           // иней трескается и осыпается
   THAW_WAVE_MS_PX: 1.1,   // волна тепла от собранной гирлянды: задержка таяния на единицу расстояния
@@ -210,12 +212,14 @@ const CFG = {
   GOLD_BADGE_R: 10.5,      // радиус счётчика золотой лампы
   GOLD_BADGE_DY: 15,      // счётчик — над проводом, на столько выше подвеса
   GOLD_WARN: 3,           // с какого числа счётчик тревожится
-  GOLD_TICK_MS: 280,      // толчок счётчика на каждый ход
+  GOLD_TICK_MS: 460,      // счётчик на каждый ход: толчок, старое число уезжает вверх
   GOLD_LOST_MS: 560,      // золотой патрон гаснет
   SOCK_GHOST_A: 0.34,     // прозрачность силуэтов ламп на пустом проводе с цветным патроном
   SOCK_FLASH_MS: 620,     // вспышка силуэтов, когда на патрон несут чужой цвет
-  INTRO_DELAY_MS: 520,    // пауза перед первым показом механики
-  INTRO_MS: 2500,         // длительность первого показа
+  SPOT_DELAY_MS: 450,     // пауза перед бликом новой механики
+  SPOT_MS: 1300,          // длительность блика (ввод не блокирует)
+  RAY_MS: 300,            // искра тепла от собранной гирлянды до инея или птицы: минимум времени в пути
+  BIRD_NOTICE_MS: 300,    // птица замечает гирлянду и показывает путь — за столько до взлёта
 };
 
 // Детерминированный генератор случайных чисел (PROTO-BASE §5). Math.random() не используется.
@@ -253,7 +257,7 @@ const MECH = {
 // (солвер; `~` в симе, если не доказан); win — цель: доля побед бота-новичка без отмены (для подбора сида).
 // Нарастание — формой и механикой, а не размером: потолок 6 цветов и 25 ламп.
 // Уровни 11–30 варианта a: band — полоса пилы (Л 85–100% побед новичка, С 60–85%, Сл 40–60%), intro — механика, которая здесь
-// встречается впервые (первый показ), mech — рецепт механик (свойства ламп и проводов расставляет dealLevel по тому же сиду):
+// вводится (отметка в меню, справка «Как играть»; сам урок включается при первой встрече механики на любом уровне — см. lessonStart), mech — рецепт механик (свойства ламп и проводов расставляет dealLevel по тому же сиду):
 //   frost: k        k ламп в инее (среди трёх крайних на проводе, не на дне; не больше одной на провод и на цвет)
 //   iceWire: 1      один провод с лампами обледенел целиком
 //   dark: k|'all'   нижние k ламп провода тёмные ('all' — все, кроме крайней); darkWires: n — только на n проводах
@@ -274,7 +278,7 @@ const LEVELS = {
     { n: 9,  colors: 6, per: 4, caps: [4, 4, 4, 4, 4, 4, 4, 4], fill: [4, 4, 4, 4, 4, 4, 0, 0], seed: 6, par: 20, win: 0.65, note: 'шесть цветов' },
     { n: 10, colors: 6, per: 4, caps: [4, 4, 4, 4, 4, 4, 4, 2], fill: [4, 4, 4, 4, 4, 4, 0, 0], seed: 12, par: 15, win: 0.55, note: 'шесть цветов и короткий запасной' },
     // --- механики: новая примерно каждые три уровня; первый уровень с механикой — маленький и «родной», дальше смеси ---
-    { n: 11, colors: 4, per: 4, caps: [4, 4, 4, 4, 4, 4],       fill: [4, 4, 4, 4, 0, 0],       seed: 43, par: 12, win: 0.92, band: 'Л',  mech: { frost: 1 }, intro: 'frost', note: 'иней — знакомство: одна лампа в инее' },
+    { n: 11, colors: 4, per: 4, caps: [4, 4, 4, 4, 4, 4],       fill: [4, 4, 4, 2, 2, 0],       seed: 264, par: 8, win: 0.92, band: 'Л',  mech: { frost: 1 }, intro: 'frost', note: 'иней — урок: лампа в инее тянется к своей паре напротив, а гирлянда собирается одним ходом и растапливает её (подбор — qa/find-intro.mjs)' },
     { n: 12, colors: 5, per: 4, caps: [4, 4, 4, 4, 4, 4, 4],    fill: [4, 4, 4, 4, 4, 0, 0],    seed: 52, par: 15, win: 0.75, band: 'С',  mech: { frost: 3 }, note: 'иней × 3 на пяти цветах' },
     { n: 13, colors: 5, per: 4, caps: [4, 4, 4, 4, 4, 4, 4],    fill: [4, 4, 4, 4, 4, 0, 0],    seed: 86, par: 16, win: 0.7,  band: 'С',  mech: { iceWire: 1 }, intro: 'iceWire', note: 'обледеневший провод: то же «если», но замёрз весь провод' },
     { n: 14, colors: 4, per: 4, caps: [4, 4, 4, 4, 4, 4],       fill: [4, 4, 4, 4, 0, 0],       seed: 17, par: 13, win: 0.92, band: 'Л',  mech: { dark: 2, darkWires: 2 }, intro: 'dark', note: 'тёмная лампа — знакомство: тёмные на дне двух проводов' },
@@ -286,7 +290,7 @@ const LEVELS = {
     { n: 20, colors: 4, per: 4, caps: [4, 4, 4, 4, 4, 4],       fill: [4, 4, 4, 4, 0, 0],       seed: 63, par: 11, win: 0.9,  band: 'Л',  mech: { sock: 1 }, intro: 'sock', note: 'цветной патрон — знакомство: один пустой провод только под свой цвет' },
     { n: 21, colors: 5, per: 4, caps: [4, 4, 4, 4, 4, 4, 4],    fill: [4, 4, 4, 4, 4, 2, 0],    seed: 27, par: 18, win: 0.72, band: 'С',  mech: { sock: 1, wild: 2 }, note: 'патрон на единственном пустом проводе + перламутровые × 2' },
     { n: 22, colors: 5, per: 4, caps: [4, 4, 4, 4, 4, 4, 4],    fill: [4, 4, 4, 4, 4, 0, 0],    seed: 107, par: 16, win: 0.5,  band: 'Сл', mech: { sock: 1, frost: 2 }, note: 'патрон + иней × 2' },
-    { n: 23, colors: 4, per: 4, caps: [4, 4, 4, 4, 4, 4],       fill: [4, 4, 4, 4, 0, 0],       seed: 140, par: 11, win: 0.9,  band: 'Л',  mech: { bird: 1 }, intro: 'bird', note: 'птица — знакомство: сидит на проводе с лампами' },
+    { n: 23, colors: 4, per: 4, caps: [4, 4, 4, 4, 4, 4],       fill: [4, 2, 4, 2, 4, 0],       seed: 18295, par: 7, win: 0.9,  band: 'Л',  mech: { bird: 1 }, intro: 'bird', note: 'птица — урок: сидит на проводе с лампой, которой есть куда лететь; гирлянда собирается одним ходом, и птица перелетает (подбор — qa/find-intro.mjs)' },
     { n: 24, colors: 5, per: 4, caps: [4, 4, 4, 4, 4, 4, 4],    fill: [4, 4, 4, 4, 4, 2, 0],    seed: 67, par: 17, win: 0.72, band: 'С',  mech: { bird: 1, wild: 2 }, note: 'птица + перламутровые × 2' },
     { n: 25, colors: 5, per: 4, caps: [4, 4, 4, 4, 4, 4, 4],    fill: [4, 4, 4, 4, 4, 0, 0],    seed: 114, par: 13, win: 0.5,  band: 'Сл', mech: { bird: 1, sock: 1 }, note: 'птица + цветной патрон' },
     { n: 26, colors: 4, per: 4, caps: [4, 4, 4, 4, 4, 4],       fill: [4, 4, 4, 4, 0, 0],       seed: 4, par: 11, win: 0.92, band: 'Л',  mech: { gold: 13 }, intro: 'gold', note: 'золотая лампа — знакомство: счётчик с большим запасом' },
@@ -618,7 +622,7 @@ function log(kind, name, info){                       // журнал [game] —
 const SAVE_KEY = NAME + '.v1';
 function loadSave(){ try { return JSON.parse(localStorage.getItem(SAVE_KEY)) || {}; } catch (e) { return {}; } }
 function save(){ try { localStorage.setItem(SAVE_KEY, JSON.stringify(G.save)); } catch (e) {} }
-// unlockAll — чит (PROTO-BASE §6); gold — уровни, где взят бонус золотой лампы; seen — механики, первый показ которых уже был
+// unlockAll — чит (PROTO-BASE §6); gold — уровни, где взят бонус золотой лампы; seen — уроки механик: 1 — механика встречена (блик был), 2 — правило прожито
 const freshSave = () => ({ v: 'a', level: { a: 0, b: 0 }, best: { a: {}, b: {} }, gold: { a: {}, b: {} }, seen: {}, muted: false, unlockAll: false });
 // Вариант правил: ?v=a | ?v=b в адресе, иначе последний выбранный в меню.
 const QV = (() => { try { const v = new URLSearchParams(location.search).get('v'); return v === 'a' || v === 'b' ? v : null; } catch (e) { return null; } })();
@@ -638,7 +642,11 @@ const G = {
   hint: null,                    // { a, b, t0, until, auto }
   idleT: 0,                      // время последнего ввода (для руки на 1-м уровне)
   bad: null,                     // { ci, t0 } — тряска при неверном ходе
-  intro: null,                   // { kind, t0, until, ci } — первый показ механики
+  spot: null,                    // { kind, t0, until } — блик новой механики (ввод не блокирует)
+  lesson: null,                  // { keys, bump } — непрожитые уроки механик этого уровня; bump — во что игрок упёрся
+  handCache: null,               // { key, m } — ход руки урока для текущей позиции
+  rays: [],                      // искры тепла от собранной гирлянды: [{ x0, y0, x1, y1, t0, d, col }]
+  frameErrors: 0, lastError: '', // исключения кадра (цикл их переживает, см. frame)
   winT: -1e9,                    // момент финальной волны
   fxSeed: 1,
   timeScale: 1,
@@ -653,7 +661,7 @@ const G = {
 // Визуальная модель: лампы-объекты по контейнерам (зеркало s.tubes), итоговая гирлянда (вариант a), крышки (вариант b).
 // Механики: bird — { at, from, t0, d } (птица и её перелёт), iceWire — обледеневший провод, iceWireT — когда он оттаял,
 // birdHopT/birdArcT/sockFlashT/goldTickT — моменты откликов (подпрыгнула, пунктир «куда полетит», вспышка силуэтов, толчок счётчика).
-const V = { cont: [], top: [], capT: {}, goldT: {}, bornT: {}, bird: null, iceWire: -1, iceWireT: {}, birdHopT: -1e9, birdArcT: -1e9, sockFlashT: -1e9, goldTickT: -1e9 };
+const V = { cont: [], top: [], capT: {}, goldT: {}, bornT: {}, bird: null, iceWire: -1, iceWireT: {}, birdHopT: -1e9, birdArcT: -1e9, sockFlashT: -1e9, goldTickT: -1e9, goldPrev: -1 };
 const GEO = { cont: [], ghost: -1, r: CFG.BULB_R, rowH: 80, k: 1, slot: CFG.B_SLOT, tw: CFG.B_TUBE_W };
 
 const dur = (ms) => ms / G.timeScale;
@@ -754,6 +762,7 @@ const Sound = {
   spare(){ this.tone(300, 240, 'triangle', 0.09, 0, 900); this.bell(this.note(6), 0.16, 0.06); log('sound', 'spare'); },
   stuck(){ this.bell(392, 0, 0.07); this.bell(330, 0.22, 0.07); log('sound', 'stuck'); },
   // --- механики ---
+  glint(){ this.tone(3300, 120, 'sine', 0.035, 0, 0, true); this.tone(4400, 180, 'sine', 0.028, 0.07, 0, true); log('sound', 'glint'); },   // блик по льду: новая механика
   iceTap(){ this.tone(2400, 70, 'sine', 0.06, 0, 1700); this.tone(3300, 110, 'sine', 0.04, 0.03, 0, true); this.hiss(50, 'highpass', 5000, 0.12); log('sound', 'ice.tap'); },   // стук по льду: не снимается
   crack(at){ this.hiss(70, 'highpass', 3400, 0.2, at || 0, 2); this.tone(1900, 50, 'square', 0.03, at || 0, 700); },
   thaw(){ [0, 0.09, 0.21, 0.34].forEach(a => this.crack(a)); this.tone(220, 900, 'sine', 0.07, 0.08, 440, true); [7, 9, 12].forEach((s, i) => this.bell(this.note(s), 0.26 + i * 0.1, 0.05)); log('sound', 'thaw'); },
@@ -861,10 +870,12 @@ function toast(msg){ const t = $('toast'); t.textContent = msg; t.classList.remo
 const cv = $('cv'), ctx = cv.getContext('2d');
 const VW = CFG.VW;
 let scale = 1, W = VW, H = 640, DPR = 1;
+// Запасной контейнер на первых уровнях спрятан: на экране только то, что нужно для урока.
+const spareOpen = (s) => s.li >= CFG.SPARE_FROM_LEVEL - 1;
 // layout(): места контейнеров. Место под запасной контейнер зарезервировано заранее (призрак) — поле не прыгает.
 function layout(){
   const s = G.s; if (!s) return;
-  const n = s.caps.length, ghost = s.spare < CFG.SPARE_PER_LEVEL ? 1 : 0, N = n + ghost;
+  const n = s.caps.length, ghost = s.spare < CFG.SPARE_PER_LEVEL && spareOpen(s) ? 1 : 0, N = n + ghost;
   const capOf = (i) => i < n ? s.caps[i] : s.per;
   GEO.cont = []; GEO.ghost = ghost ? n : -1;
   if (s.v === 'a'){
@@ -959,7 +970,7 @@ function syncVisual(){
   const s = G.s, t = now();
   V.cont = s.tubes.map((str, i) => Array.from(str, (ch, j) => { const l = mkLamp(lampAt(str, j), i, j); if (i === s.ice) l.ice = true; return l; }));   // на обледеневшем проводе в инее все лампы
   V.top = []; V.capT = {}; V.goldT = {}; V.bornT = {};
-  V.bird = s.bird >= 0 ? { at: s.bird, from: -1, t0: 0, d: 1 } : null; V.iceWire = s.ice; V.iceWireT = {}; G.intro = null;
+  V.bird = s.bird >= 0 ? { at: s.bird, from: -1, t0: 0, d: 1 } : null; V.iceWire = s.ice; V.iceWireT = {}; G.spot = null; G.rays = []; G.handCache = null;
   if (RULES[s.v].leave) s.done.forEach((col) => { const n = perOf(s, col); for (let j = 0; j < n; j++){ const l = mkLamp(col, -1, 0); l.top = V.top.length; l.lit = tw(1); l.sc = tw(CFG.TOP_SCALE); V.top.push(l); } });
   else s.tubes.forEach((str, i) => { if (isComplete(str, s.per)) V.capT[i] = -1e9; });
   layout();
@@ -1040,7 +1051,7 @@ function startLevel(li, v){
   const L = levelsOf(G.v)[li];
   log('event', 'level.start', 'v=' + G.v + ' level=' + (li + 1) + ' par=' + L.par + (L.mech ? ' mech=' + Object.keys(L.mech).filter(k => MECH[k]).join('+') : ''));
   goto('game'); hud(); render();
-  if (L.intro && !G.save.seen[L.intro]) after(CFG.INTRO_DELAY_MS, () => introShow(L.intro));   // первая встреча механики — короткий показ
+  lessonStart();                                         // непрожитые механики уровня — блик и урок (и на вводном уровне, и на смеси)
 }
 function hud(){
   const s = G.s, v = s ? s.v : G.v;
@@ -1049,13 +1060,14 @@ function hud(){
   $('btn-mute').classList.toggle('off', !!G.save.muted);
   $('spare-label').textContent = RULES[v].unit;
   $('btn-spare').disabled = !s || s.spare >= CFG.SPARE_PER_LEVEL;
+  $('btn-spare').style.visibility = s && !spareOpen(s) && !s.spare ? 'hidden' : '';
   $('btn-undo').disabled = !s || !s.hist.length;
 }
 const canInput = () => G.s && G.screen === 'game' && !G.ending && now() >= G.lockUntil;
 // liftWhy: почему с провода нельзя снять лампы — 'bird' | 'ice' | 'frost' | '' (можно или провод пуст)
 function liftWhy(ci){ const s = G.s, t = s.tubes[ci]; if (!t || !t.length) return ''; return s.bird === ci ? 'bird' : s.ice === ci ? 'ice' : (topLamp(t) & ICE) ? 'frost' : ''; }
 const liftable = (ci) => ci >= 0 && G.s.tubes[ci] && G.s.tubes[ci].length > 0 && !liftWhy(ci) && !(!RULES[G.s.v].leave && isComplete(G.s.tubes[ci], G.s.per));
-function noteInput(){ G.idleT = now(); if (G.hint && G.hint.auto) G.hint = null; G.intro = null; }
+function noteInput(){ G.idleT = now(); if (G.hint && G.hint.auto) G.hint = null; }
 function select(ci, quiet){
   const t = now();
   for (const l of selLamps()) twTo(l.lift, 0, t, 140);
@@ -1070,6 +1082,8 @@ function select(ci, quiet){
 // bad: отказ — тряска провода и отклик по причине: птица чирикает и показывает, куда полетит; лёд звенит; патрон вспыхивает силуэтами
 function bad(ci, why){
   G.bad = { ci, t0: now() }; buzz(30); log('fx.start', 'bad', 'c=' + ci + (why ? ' why=' + why : ''));
+  const bk = why === 'frost' ? 'frost' : why === 'ice' ? 'iceWire' : why === 'bird' ? 'bird' : '';
+  if (bk && G.lesson && G.lesson.keys.includes(bk) && !learned(bk)){ G.lesson.bump = bk; G.idleT = now(); log('event', 'lesson.bump', bk); }   // упёрся в непрожитую механику — рука покажет выход, если он в одном ходе
   if (why === 'bird'){ V.birdHopT = V.birdArcT = now(); Sound.chirp(); }
   else if (why === 'ice' || why === 'frost'){
     const arr = V.cont[ci] || [], l = why === 'frost' ? arr[arr.length - 1] : null, p = l ? { x: l.px, y: l.py + bulbH() * 0.4 } : contCenter(ci);
@@ -1110,15 +1124,24 @@ function doMove(a, b){
   }
   log('fx.start', 'fly', 'n=' + n);
   if (last.reveal && src.length){ const rl = src[src.length - 1]; after(150, () => revealFx(rl)); }       // тёмная стала крайней — загорается цветом
-  if (s0.gold && s0.gold.st === 0){                                                                        // золотая: счётчик толкается каждый ход
-    V.goldTickT = t;
+  if (G.lesson) G.lesson.bump = '';
+  // уроки: правило прожито, когда случилось событие, которое его показывает
+  if (last.thaw){ if (s0.tubes.some(x => hasFlag(x, ICE))) learn('frost'); if (s0.ice >= 0) learn('iceWire'); }
+  if (last.reveal) learn('dark');
+  if (last.completed && last.col === WILD) learn('wild');
+  if (!s0.tubes[b].length && s0.sock[b] >= 0) learn('sock');
+  if (last.birdTo >= 0) learn('bird');
+  if (last.gold === 'got' || last.gold === 'lost') learn('gold');
+  if (s0.gold && s0.gold.st === 0){                                                                        // золотая: счётчик толкается каждый ход, старое число уезжает
+    V.goldTickT = t; V.goldPrev = s0.gold.left;
+    for (const arr of V.cont) for (const gl of arr) if (gl.gold) ring(gl.px, gl.py - CFG.GOLD_BADGE_DY, last.gold === 'lost' ? '#ff7a5c' : PAL.gold, 9, 30, 460, 2.5);
     if (last.gold === 'lost') goldLostFx(); else if (last.gold !== 'got') Sound.tick(G.s.gold.left);
   }
   relight(a, t);
   const landAll = (n - 1) * CFG.FLY_STAGGER_MS + flyMs;
   after(landAll, () => log('fx.end', 'fly'));
   if (last.completed){
-    G.lockUntil = t + dur(landAll + 60 + s0.per * CFG.WAVE_STEP_MS + CFG.DONE_HOLD_MS + (isA ? 120 : CFG.CAP_MS) + (last.birdTo >= 0 ? CFG.BIRD_FLY_MS * 0.6 : 0));
+    G.lockUntil = t + dur(landAll + 60 + s0.per * CFG.WAVE_STEP_MS + Math.max(CFG.DONE_HOLD_MS + (isA ? 120 : CFG.CAP_MS), last.birdTo >= 0 ? CFG.RAY_MS + CFG.BIRD_NOTICE_MS + CFG.BIRD_FLY_MS * 0.6 : 0));
     if (isWin(G.s)) G.lockUntil = Infinity;
     after(landAll + 60, () => completeSeq(b, last));
   } else after(landAll + 80, checkStuck);
@@ -1170,7 +1193,11 @@ function completeSeq(ci, last){
     burst(c.x, c.y, [hex, hex, PAL.warm, '#ffffff'], 30, 260, { life: 800, size: 10, g: 260 });
     arr.forEach(l => { l.flashT = now(); l.flashK = 1; });
     if (last.thaw) thawFx(c.x, c.y);                       // первая гирлянда — волна тепла, иней трескается и тает
-    if (last.birdTo >= 0) birdFly(last.birdTo);            // птица перелетает на следующий провод
+    if (last.birdTo >= 0 && V.bird){                       // искра от гирлянды долетает до птицы: та подпрыгивает, показывает путь и летит по нему
+      const bp = wireEnd(V.bird.at); ray(c.x, c.y, bp.x, bp.y - 14, CFG.RAY_MS, PAL.warm);
+      after(CFG.RAY_MS, () => { V.birdHopT = V.birdArcT = now(); Sound.chirp(); });
+      after(CFG.RAY_MS + CFG.BIRD_NOTICE_MS, () => birdFly(last.birdTo));
+    }
     if (last.gold === 'got') goldFx(c.x, c.y);             // золотая собрана вовремя — бонус
   });
   after(per * CFG.WAVE_STEP_MS + CFG.DONE_HOLD_MS, () => {
@@ -1224,23 +1251,27 @@ function revealFx(l, quiet){
   if (l.ci >= 0 && l.top < 0) relight(l.ci, t);
   log('fx.start', 'reveal', 'color=' + COLOR_NAMES[l.col]); after(CFG.REVEAL_MS, () => log('fx.end', 'reveal'));
 }
-// thawFx: волна тепла от собранной гирлянды; каждая лампа в инее трескается и осыпается, когда волна до неё дошла
+// thawFx: тепло от собранной гирлянды. К каждой лампе в инее (и к обледеневшему проводу) летит искра; долетела — лёд трескается и осыпается.
 function thawFx(x, y){
   log('fx.start', 'thaw'); Sound.thaw(); buzz([10, 30, 10, 30, 20]);
-  ring(x, y, PAL.warm, 20, 470, 950, 5); ring(x, y, '#ffb86b', 10, 380, 780, 3);
+  ring(x, y, PAL.warm, 20, 470, 950, 7); ring(x, y, '#ffb86b', 10, 380, 780, 4);
   let maxD = 0;
   const crackAt = (px, py, n) => burst(px, py, ['#ffffff', PAL.ice, '#9fd8ff'], n, 150, { life: 640, size: 6, g: 540 });
+  const reach = (px, py) => { const d = Math.max(CFG.RAY_MS, 120 + Math.hypot(px - x, py - y) * CFG.THAW_WAVE_MS_PX); maxD = Math.max(maxD, d); ray(x, y, px, py, d, PAL.warm); return d; };
   for (const arr of V.cont) for (const l of arr){
     if (!l.ice) continue;
-    const d = 120 + Math.hypot(l.px - x, l.py - y) * CFG.THAW_WAVE_MS_PX; maxD = Math.max(maxD, d);
-    after(d, () => { l.ice = false; l.iceT = now(); l.landT = now(); l.landDir = l.id % 2 ? 1 : -1; crackAt(l.px, l.py + bulbH() * 0.4, 12); Sound.crack(); });
+    const ly = l.py + bulbH() * 0.4;
+    after(reach(l.px, ly), () => { l.ice = false; l.iceT = now(); l.landT = now(); l.landDir = l.id % 2 ? 1 : -1; l.flashT = now(); l.flashK = 0.8;
+      crackAt(l.px, ly, 12); ring(l.px, ly, PAL.warm, 6, 44, 420, 3); Sound.crack(); });
   }
   if (V.iceWire >= 0){
-    const i = V.iceWire, c = contCenter(i), d = 120 + Math.hypot(c.x - x, c.y - y) * CFG.THAW_WAVE_MS_PX; maxD = Math.max(maxD, d);
-    after(d, () => { V.iceWire = -1; V.iceWireT[i] = now(); const g = GEO.cont[i]; if (g) for (let k = 0; k <= g.cap; k++) crackAt(g.x0 + g.dir * (CFG.A_WALL + k * g.step), g.y + 6, 5); });
+    const i = V.iceWire, c = contCenter(i);
+    after(reach(c.x, c.y), () => { V.iceWire = -1; V.iceWireT[i] = now(); const g = GEO.cont[i]; if (g) for (let k = 0; k <= g.cap; k++) crackAt(g.x0 + g.dir * (CFG.A_WALL + k * g.step), g.y + 6, 5); });
   }
   after(maxD + CFG.THAW_MS, () => log('fx.end', 'thaw'));
 }
+// ray: искра тепла летит из (x0, y0) в (x1, y1) за ms — видимая причина: гирлянда → иней, гирлянда → птица
+function ray(x0, y0, x1, y1, ms, col){ G.rays.push({ x0, y0, x1, y1, t0: now(), d: dur(ms), col }); }
 // birdFly: птица перелетает на провод to (ядро её уже пересадило)
 function birdFly(to){
   if (!V.bird) return;
@@ -1262,25 +1293,78 @@ function goldLostFx(){
   for (const arr of V.cont) for (const l of arr) if (l.gold){ l.gold = false; l.goldT = now(); burst(l.px, l.py, ['#8d8a80', '#5c5a55', '#c9c2a8'], 12, 90, { life: 560, size: 6, g: 160 }); }
   after(CFG.GOLD_LOST_MS, () => log('fx.end', 'gold.lost'));
 }
-// --- первый показ механики: один раз на механику (save.seen), без текста; любое касание его снимает ---
-// Что показывает: иней и обледеневший провод — тап-призрак, лёд не поддаётся, тёплая волна от итоговой гирлянды;
-// тёмная — стекло мерцает цветами уровня; перламутровая — кольца на всех проводах, куда она сядет; патрон — силуэты и лампы
-// его цвета вспыхивают; птица — подпрыгивает и показывает пунктиром, куда полетит; золотая — счётчик тикает, её цвет вспыхивает.
-function introShow(kind, force){
-  const s = G.s; if (!s || G.screen !== 'game' || (!force && G.save.seen[kind])) return;
-  G.save.seen[kind] = 1; save();
-  const t = now(), I = G.intro = { kind, t0: t, until: t + dur(CFG.INTRO_MS), ci: -1 }, live = () => G.intro === I;
-  log('fx.start', 'intro.' + kind); after(CFG.INTRO_MS, () => { if (live()) G.intro = null; log('fx.end', 'intro.' + kind); });
-  const flashCol = (col, at) => { let k = 0; for (const arr of V.cont) for (const l of arr) if (l.col === col && !l.hid){ const side = k % 2 ? 1 : -1; after(at + (k++) * 110, () => { if (!live()) return; l.flashT = now(); l.flashK = 0.9; l.landT = now(); l.landDir = side; Sound.ting(k); }); } };
-  if (kind === 'frost' || kind === 'iceWire'){
-    I.ci = kind === 'iceWire' ? s.ice : V.cont.findIndex(arr => arr.some(l => l.ice));
-    if (I.ci >= 0) after(700, () => { if (live()) bad(I.ci, kind === 'iceWire' ? 'ice' : 'frost'); });
+// --- уроки механик: без текста и без блокировки ввода ---
+// save.seen[k]: 1 — механика встречена (блик был), 2 — правило прожито: случилось событие, которое его показывает
+// (иней растаял от гирлянды, тёмная открылась, перламутровые собрались, лампа села на цветной патрон, птица перелетела,
+// счётчик золотой дошёл до бонуса или погас). Пока правило не прожито, урок включается на любом уровне с этой механикой —
+// и на вводном, и на смеси, куда попали читом.
+// Урок = блик на элементе механики при старте (spot) + рука на первом шаге (lessonMove) + причинность в анимации
+// (искра тепла от гирлянды, путь птицы, счётчик на каждом ходу).
+const learned = (k) => G.save.seen[k] === 2;
+function learn(k){ if (!MECH[k] || learned(k)) return; G.save.seen[k] = 2; save(); log('event', 'lesson.learned', k); if (G.hint && G.hint.auto) G.hint = null; }
+function lessonStart(){
+  const s = G.s, L = levelsOf(s.v)[s.li];
+  const keys = s.v === 'a' ? Object.keys(L.mech || {}).filter(k => MECH[k] && !learned(k)).sort((a, b) => MECH[a].order - MECH[b].order) : [];
+  G.lesson = keys.length ? { keys, bump: '' } : null; G.handCache = null;
+  keys.forEach((k, q) => after(CFG.SPOT_DELAY_MS + q * CFG.SPOT_MS, () => spot(k)));
+}
+// spot: блик новой механики — её элемент один раз вспыхивает и звучит. Ввод не блокируется, касание ничего не отменяет.
+//   иней и обледеневший провод — блик по льду; тёмная — стекло мерцает цветами уровня; перламутровая — перелив;
+//   патрон — силуэты и лампы его цвета вспыхивают; птица — подпрыгивает и показывает, куда полетит; золотая — счётчик и её цвет.
+function spot(kind, force){
+  const s = G.s; if (!s || G.screen !== 'game' || !MECH[kind] || (!force && learned(kind))) return;
+  if (!G.save.seen[kind]){ G.save.seen[kind] = 1; save(); }
+  const t = now(), I = G.spot = { kind, t0: t, until: t + dur(CFG.SPOT_MS) }, live = () => G.spot === I;
+  log('fx.start', 'spot.' + kind); after(CFG.SPOT_MS, () => { if (live()) G.spot = null; log('fx.end', 'spot.' + kind); });
+  const flashCol = (col, at) => { let k = 0; if (col === undefined || col < 0) return; for (const arr of V.cont) for (const l of arr) if (l.col === col && !l.hid){ const side = k % 2 ? 1 : -1; after(at + (k++) * 110, () => { if (!live()) return; l.flashT = now(); l.flashK = 0.9; l.landT = now(); l.landDir = side; Sound.ting(k); }); } };
+  if (kind === 'frost' || kind === 'iceWire') Sound.glint();
+  if (kind === 'dark') [0, 300, 600].forEach((d, k) => after(d, () => { if (live()) Sound.ting(k * 2); }));
+  if (kind === 'wild') Sound.pearl();
+  if (kind === 'sock'){ V.sockFlashT = t + dur(250); flashCol(s.sock.find(x => x >= 0), 250); }
+  if (kind === 'bird'){ V.birdHopT = V.birdArcT = t; Sound.chirp(); }
+  if (kind === 'gold' && s.gold){ V.goldTickT = t; V.goldPrev = -1; Sound.tick(9); flashCol(s.gold.col, 250); }
+}
+// safeMove: первый ход из списка, после которого уровень ещё собирается (рука не заводит в тупик)
+function safeMove(s, cands){
+  for (const m of cands){ const s2 = applyMove(s, m); if (isWin(s2)) return m; const r = solveInfo(s2, { nodes: CFG.HINT_NODES, weight: CFG.HINT_WEIGHT }); if (r.path || !r.complete) return m; }
+  return null;
+}
+// lessonMove: ход, который показывает рука урока, или null. Рука — только на первом шаге урока и только на настоящий ход:
+//   первый уровень — первый ход, пока не собрана первая гирлянда (рука идёт за выбором игрока);
+//   тёмная — ход, который открывает тёмную лампу; перламутровая — посадить её на чужой цвет; патрон — свой цвет на его провод
+//   (все три — только до первого хода на уровне);
+//   иней, обледеневший провод, птица — после того как игрок в них упёрся: ход, который собирает гирлянду, если он есть прямо сейчас.
+function lessonMove(){
+  const s = G.s; if (!s || isWin(s)) return null;
+  const Ls = G.lesson, base = s.li === 0 && !s.done.length;
+  if (!base && !(Ls && Ls.keys.some(k => !learned(k)))) return null;
+  const key = s.moves + '|' + s.tubes.join('|') + '|' + G.sel + '|' + (Ls ? Ls.bump : '');
+  if (G.handCache && G.handCache.key === key) return G.handCache.m;
+  const P = posOf(s), evOf = (m) => Object.assign({ ev: stepPos(s, P, m).ev }, m), ms = legalMoves(s).map(evOf);
+  const rank = (m) => m.ev.completed ? 0 : m.ev.merge && !m.ev.wild ? 1 : 2, byRank = (arr) => arr.sort((x, y) => rank(x) - rank(y));
+  let m = null;
+  if (base){
+    if (G.sel >= 0){ const from = []; for (let b = 0; b < s.tubes.length; b++){ const n = canMove(s, G.sel, b); if (n) from.push(evOf({ a: G.sel, b, n })); } m = safeMove(s, byRank(from)); }
+    else m = hintMove(s).move;
+  } else for (const k of Ls.keys){
+    if (learned(k)) continue;
+    let c = [];
+    if (k === 'dark' && !s.moves) c = ms.filter(x => x.ev.reveal);
+    if (k === 'wild' && !s.moves){ c = ms.filter(x => x.ev.wild && (topLamp(s.tubes[x.a]) & COLOR) === WILD); if (!c.length) c = ms.filter(x => x.ev.wild); }
+    if (k === 'sock' && !s.moves) c = ms.filter(x => !s.tubes[x.b].length && s.sock[x.b] >= 0);
+    if ((k === 'frost' || k === 'iceWire' || k === 'bird') && Ls.bump === k) c = ms.filter(x => x.ev.completed);
+    m = safeMove(s, byRank(c));
+    if (m) break;
   }
-  if (kind === 'dark') [500, 900, 1300].forEach((d, k) => after(d, () => { if (live()) Sound.ting(k * 2); }));
-  if (kind === 'wild') after(500, () => { if (live()) Sound.pearl(); });
-  if (kind === 'sock'){ V.sockFlashT = t + dur(350); flashCol(s.sock.find(x => x >= 0), 600); }
-  if (kind === 'bird'){ after(450, () => { if (live()){ V.birdHopT = V.birdArcT = now(); Sound.chirp(); } }); after(1250, () => { if (live() && G.s.bird >= 0) bad(G.s.bird, 'bird'); }); }
-  if (kind === 'gold'){ flashCol(s.gold.col, 600); for (const d of [450, 850, 1250]) after(d, () => { if (live()){ V.goldTickT = now(); Sound.tick(9); } }); }
+  if (m && !base && G.sel >= 0 && G.sel !== m.a) m = null;      // игрок поднял другие лампы — рука не спорит
+  G.handCache = { key, m: m ? { a: m.a, b: m.b } : null };
+  return G.handCache.m;
+}
+// autoHand: рука урока появляется после паузы без ввода и исчезает с первым касанием (noteInput)
+function autoHand(t){
+  const m = lessonMove();
+  if (m){ G.hint = { a: m.a, b: m.b, t0: t, until: 0, auto: true }; log('fx.start', 'hand', m.a + '>' + m.b); }
+  else G.idleT = t;
 }
 function checkStuck(){
   if (!G.s || G.screen !== 'game' || isWin(G.s) || !isStuck(G.s)) return;
@@ -1415,6 +1499,9 @@ function frostSprite(name){
   g.globalCompositeOperation = 'source-in';
   const gr = g.createLinearGradient(0, 0, w, hh); gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.45, '#c9ebff'); gr.addColorStop(1, '#f1faff');
   g.fillStyle = gr; g.fillRect(0, 0, w, hh);
+  g.globalCompositeOperation = 'destination-out';         // середина стекла почти чистая — цвет лампы читается (красный не уходит в розовый); лёд плотный по краям
+  const hole = g.createRadialGradient(w / 2, hh * 0.6, 0, w / 2, hh * 0.6, w * 0.62); hole.addColorStop(0, 'rgba(0,0,0,.8)'); hole.addColorStop(0.55, 'rgba(0,0,0,.6)'); hole.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = hole; g.fillRect(0, 0, w, hh);
   g.globalCompositeOperation = 'source-atop'; g.strokeStyle = '#ffffff'; g.lineCap = 'round';
   for (let i = 0; i < 26; i++){                            // кристаллы: маленькие шестилучевые снежинки
     const x = r() * w, y = hh * (0.2 + r() * 0.8), s = 2.5 + r() * 5; g.globalAlpha = 0.55 + r() * 0.45; g.lineWidth = 1 + r();
@@ -1463,14 +1550,17 @@ function drawBulb(c, q, t){
   if (q.flash > 0.01) glow(c, '#ffffff', 0, h * 0.5, r * 5.5, 0.75 * q.flash);
   c.restore();
 }
-// drawGoldBadge: счётчик золотой лампы — тёмный кружок в золотом ободке с числом ходов; толкается на каждый ход, под конец тревожится
+// drawGoldBadge: счётчик золотой лампы — тёмный кружок в золотом ободке с числом ходов. На каждый ход толкается, старое число
+// уезжает вверх и гаснет, новое встаёт на место: видно, что убывает от хода, а не от времени. Под конец тревожится.
 function drawGoldBadge(c, x, y, left, t){
-  const hot = left <= CFG.GOLD_WARN, tickK = Math.max(0, 1 - (t - V.goldTickT) / dur(CFG.GOLD_TICK_MS));
-  const sc = 1 + 0.4 * tickK + (hot ? 0.08 * Math.sin(t / 110) : 0), R = CFG.GOLD_BADGE_R * sc, col = hot ? '#ff7a5c' : PAL.gold;
-  c.save(); c.translate(x, y);
+  const hot = left <= CFG.GOLD_WARN, tk = (t - V.goldTickT) / dur(CFG.GOLD_TICK_MS), tickK = tk >= 0 && tk < 1 ? 1 - tk : 0, flip = tickK > 0 && V.goldPrev > left;
+  const sc = 1 + 0.5 * tickK * tickK + (hot ? 0.08 * Math.sin(t / 110) : 0), R = CFG.GOLD_BADGE_R * sc, col = hot ? '#ff7a5c' : PAL.gold;
+  const num = (n, dy, a) => { c.globalAlpha = a; c.fillStyle = col; c.font = '900 ' + (n > 9 ? 10.5 : 12.5) * sc + 'px Nunito, system-ui, sans-serif'; c.fillText(String(n), 0, 0.8 + dy); };
+  c.save(); c.translate(x, y); c.textAlign = 'center'; c.textBaseline = 'middle';
   c.fillStyle = '#1d1405'; c.beginPath(); c.arc(0, 0, R, 0, Math.PI * 2); c.fill();
-  c.strokeStyle = col; c.lineWidth = 2; c.beginPath(); c.arc(0, 0, R, 0, Math.PI * 2); c.stroke();
-  c.fillStyle = col; c.font = '900 ' + (left > 9 ? 10.5 : 12.5) * sc + 'px Nunito, system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(String(left), 0, 0.8);
+  c.strokeStyle = col; c.lineWidth = 2 + 1.5 * tickK; c.beginPath(); c.arc(0, 0, R, 0, Math.PI * 2); c.stroke();
+  if (flip){ const e = ease(tk); num(V.goldPrev, -20 * e, 1 - e); num(left, 7 * (1 - e), clamp01(tk * 2.5)); }
+  else num(left, 0, 1);
   c.restore();
 }
 // lampLook: что лампа показывает в момент t — { dark, frost, goldA } от 0 до 1 (переходы: открытие, таяние, угасание патрона)
@@ -1478,29 +1568,32 @@ function lampLook(l, t){
   return { dark: l.hid ? 1 : 1 - clamp01((t - l.revT) / dur(CFG.REVEAL_MS)), frost: l.ice ? 1 : 1 - clamp01((t - l.iceT) / dur(CFG.THAW_MS)),
     goldA: l.gold ? 1 : 1 - clamp01((t - l.goldT) / dur(CFG.GOLD_LOST_MS)) };
 }
-// drawBird: птица на свободном конце провода — смотрит туда, куда полетит; в перелёте машет крыльями по дуге;
-// если тронули её провод — подпрыгивает, а пунктир показывает следующий провод.
+const flyingBird = () => !!V.bird && V.bird.from >= 0 && now() < V.bird.t0 + V.bird.d;
+// birdPath: точка пути птицы с конца провода fr на конец провода to, k 0..1 — одна дуга и для пунктира, и для полёта
+function birdPath(fr, to, k){ const mx = (fr.x + to.x) / 2, my = Math.min(fr.y, to.y) - CFG.BIRD_ARC * 1.3, u = 1 - k; return { x: u * u * fr.x + 2 * u * k * mx + k * k * to.x, y: u * u * fr.y + 2 * u * k * my + k * k * to.y }; }
+// drawBird: птица на свободном конце провода — смотрит туда, куда полетит. Пунктир показывает её путь: когда тронули её провод,
+// когда она заметила собранную гирлянду и пока летит (летит ровно по нему).
 function drawBird(c, t){
   const b = V.bird, s = G.s; if (!b || !GEO.cont[b.at] || s.v !== 'a') return;
   const n = s.tubes.length, to = wireEnd(b.at), flying = b.from >= 0 && t < b.t0 + b.d, sit = spr('bird-sit'), fly = spr('bird-fly');
   const next = wireEnd((b.at + 1) % n);
   let x = to.x, y = to.y, face = next.x > to.x + 2 ? 1 : next.x < to.x - 2 ? -1 : GEO.cont[b.at].dir, im = sit, rot = 0, sy = 1;
+  const path = (fr, dst, k0, a) => {                       // пунктир от k0 до конца пути и кольцо на месте посадки
+    c.save(); c.globalAlpha = 0.9 * a; c.strokeStyle = PAL.warm; c.lineWidth = 2.4; c.lineCap = 'round'; c.setLineDash([2, 7]); c.lineDashOffset = -t / 40;
+    c.beginPath(); for (let q = 0; q <= 20; q++){ const p = birdPath(fr, dst, k0 + (1 - k0) * q / 20); if (q) c.lineTo(p.x, p.y - 12); else c.moveTo(p.x, p.y - 12); } c.stroke(); c.setLineDash([]);
+    c.beginPath(); c.arc(dst.x, dst.y - 3, 6 + 2 * Math.sin(t / 160), 0, Math.PI * 2); c.stroke(); c.restore();
+  };
   if (flying){
-    const k = easeIO((t - b.t0) / b.d), fr = wireEnd(b.from);
-    x = fr.x + (to.x - fr.x) * k; y = fr.y + (to.y - fr.y) * k - CFG.BIRD_ARC * 4 * k * (1 - k);
-    face = to.x >= fr.x ? 1 : -1; im = Math.floor((t - b.t0) / dur(95)) % 2 ? sit : fly; rot = -0.15 * Math.sin(k * Math.PI);
+    const k = easeIO((t - b.t0) / b.d), fr = wireEnd(b.from), p = birdPath(fr, to, k);
+    path(fr, to, k, 1 - k * 0.4);
+    x = p.x; y = p.y; face = to.x >= fr.x ? 1 : -1; im = Math.floor((t - b.t0) / dur(95)) % 2 ? sit : fly; rot = -0.15 * Math.sin(k * Math.PI);
   } else {
     const hop = (t - V.birdHopT) / dur(CFG.BIRD_HOP_MS), land = (t - (b.t0 + b.d)) / dur(300);
     if (hop >= 0 && hop < 1){ y -= 9 * Math.abs(Math.sin(hop * Math.PI * 2)) * (1 - hop); im = Math.floor(hop * 6) % 2 ? sit : fly; }
     else if (b.from >= 0 && land >= 0 && land < 1) sy = 1 - 0.14 * Math.sin(land * Math.PI);
     rot = 0.05 * Math.sin(t / 700);
     const ak = (t - V.birdArcT) / dur(CFG.BIRD_ARC_MS);
-    if ((ak >= 0 && ak < 1) || (G.intro && G.intro.kind === 'bird')){        // пунктир: куда полетит после следующей гирлянды
-      const a = ak >= 0 && ak < 1 ? Math.min(1, ak * 8, (1 - ak) * 4) : 0.8, mx = (to.x + next.x) / 2, my = Math.min(to.y, next.y) - CFG.BIRD_ARC * 1.3;
-      c.save(); c.globalAlpha = 0.85 * a; c.strokeStyle = PAL.warm; c.lineWidth = 2.2; c.lineCap = 'round'; c.setLineDash([2, 7]); c.lineDashOffset = -t / 40;
-      c.beginPath(); c.moveTo(to.x, to.y - 16); c.quadraticCurveTo(mx, my, next.x, next.y - 8); c.stroke(); c.setLineDash([]);
-      c.beginPath(); c.arc(next.x, next.y - 2, 6 + 2 * Math.sin(t / 160), 0, Math.PI * 2); c.stroke(); c.restore();
-    }
+    if (ak >= 0 && ak < 1) path(to, next, 0, Math.min(1, ak * 8, (1 - ak) * 4));
   }
   if (!im) return;
   const w = CFG.BIRD_W, hh = w * im.height / im.width;
@@ -1508,37 +1601,58 @@ function drawBird(c, t){
   c.save(); c.translate(x, y); c.rotate(rot * face); c.scale(-face, sy);                   // спрайт смотрит влево
   c.drawImage(im, -w * 0.52, -hh * 0.93, w, hh); c.restore();
 }
-// drawIntro: первый показ механики — кольца на её элементах и короткая сценка (см. introShow)
-function drawIntro(c, t){
-  const I = G.intro, s = G.s; if (!I) return;
+// drawSpot: блик новой механики (см. spot) — одно расходящееся кольцо и звёздочка, пробегающая по элементу; колец «навсегда» нет
+function drawSpot(c, t){
+  const I = G.spot, s = G.s; if (!I) return;
   const k = (t - I.t0) / (I.until - I.t0); if (k >= 1 || k < 0) return;
-  const fade = Math.min(1, k * 7, (1 - k) * 5), pulse = 0.5 + 0.5 * Math.sin(t / 150), bh = bulbH();
-  const ringAt = (x, y, r, col) => { c.save(); c.globalCompositeOperation = 'lighter'; c.globalAlpha = (0.45 + 0.45 * pulse) * fade; c.strokeStyle = col || PAL.accent; c.lineWidth = 2.6; c.beginPath(); c.arc(x, y, r + 2.5 * pulse, 0, Math.PI * 2); c.stroke(); c.restore(); };
+  const bh = bulbH(), fade = Math.min(1, k * 8, (1 - k) * 3);
+  const glint = (x, y, r, col, ph) => {
+    const q = k * 1.7 - (ph || 0); if (q <= 0 || q >= 1) return;
+    c.save(); c.globalCompositeOperation = 'lighter'; c.strokeStyle = col; c.lineWidth = 3.2 * (1 - q) + 0.6; c.globalAlpha = 0.95 * (1 - q);
+    c.beginPath(); c.arc(x, y, r * (0.8 + 1.0 * ease(q)), 0, Math.PI * 2); c.stroke();
+    const sx = x + (q - 0.5) * r * 1.2, sy = y - (q - 0.5) * r * 1.6, sz = r * 0.6 * Math.sin(q * Math.PI);
+    c.globalAlpha = Math.sin(q * Math.PI); c.strokeStyle = '#ffffff'; c.lineWidth = 1.8; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(sx - sz, sy); c.lineTo(sx + sz, sy); c.moveTo(sx, sy - sz); c.lineTo(sx, sy + sz); c.stroke();
+    c.restore(); glow(c, col, x, y, r * 4.4, 0.4 * Math.sin(q * Math.PI));
+  };
   const lamps = (f) => { const out = []; for (const arr of V.cont) for (const l of arr) if (f(l)) out.push(l); return out; };
-  if (I.kind === 'frost' || I.kind === 'iceWire'){
-    const ls = lamps(l => l.ice);
-    for (const l of ls) ringAt(l.px, l.py + bh * 0.5, GEO.r * 1.55, PAL.ice);
-    if (I.ci >= 0 && k > 0.12 && k < 0.42){ const p = contCenter(I.ci), pk = (k - 0.12) / 0.3; drawTouch(c, p.x, p.y + 8, 0.9 * fade, Math.sin(pk * Math.PI)); }
-    if (k > 0.5 && ls.length){                              // тепло приходит от итоговой гирлянды: собери любую — иней растает
-      const wk = (k - 0.5) / 0.5, x0 = W / 2, y0 = CFG.TOP_Y + CFG.TOP_SAG;
-      glow(c, PAL.warm, x0, y0, W * 1.1, 0.5 * Math.sin(wk * Math.PI));
-      c.save(); c.globalCompositeOperation = 'lighter'; c.strokeStyle = PAL.warm; c.lineWidth = 4 * (1 - wk) + 1; c.globalAlpha = 0.8 * (1 - wk);
-      c.beginPath(); c.arc(x0, y0, 20 + wk * H * 0.75, 0.1 * Math.PI, 0.9 * Math.PI); c.stroke(); c.restore();
+  if (I.kind === 'frost') lamps(l => l.ice).forEach((l, q) => glint(l.px, l.py + bh * 0.45, GEO.r * 1.5, PAL.ice, q * 0.12));
+  if (I.kind === 'iceWire' && V.iceWire >= 0) (V.cont[V.iceWire] || []).forEach((l, q) => glint(l.px, l.py + bh * 0.45, GEO.r * 1.5, PAL.ice, q * 0.1));
+  if (I.kind === 'dark') lamps(l => l.hid).forEach((l, q) => {
+    glint(l.px, l.py + bh * 0.5, GEO.r * 1.4, '#ffffff', q * 0.1);
+    glow(c, colorHex(Math.floor(t / dur(140) + l.id) % s.colors), l.px, l.py + bh * 0.55, GEO.r * 4.6, 0.6 * fade);       // стекло мерцает цветами: внутри любой из них
+  });
+  if (I.kind === 'wild') lamps(l => l.col === WILD).forEach((l, q) => glint(l.px, l.py + bh * 0.5, GEO.r * 1.6, PEARL[q % PEARL.length], q * 0.15));
+  if (I.kind === 'bird' && V.bird){ const p = wireEnd(V.bird.at); glint(p.x, p.y - CFG.BIRD_W * 0.42, CFG.BIRD_W * 0.55, PAL.warm, 0); }
+  if (I.kind === 'gold') lamps(l => l.gold).forEach(l => { glint(l.px, l.py + bh * 0.42, GEO.r * 1.8, PAL.gold, 0); glint(l.px, l.py - CFG.GOLD_BADGE_DY, CFG.GOLD_BADGE_R + 5, PAL.gold, 0.25); });
+}
+// drawLesson: пока урок перламутровой не прожит — при поднятых лампах кольца там, куда они сядут «через перламутр»:
+// поднята перламутровая — на крайней лампе любого цвета (и белое кольцо на своей), поднята обычная — на перламутровой.
+function drawLesson(c, t){
+  const Ls = G.lesson, s = G.s; if (!Ls || G.sel < 0 || !s.tubes[G.sel] || !s.tubes[G.sel].length || !Ls.keys.includes('wild') || learned('wild')) return;
+  const top = topLamp(s.tubes[G.sel]) & COLOR, pulse = 0.5 + 0.5 * Math.sin(t / 150), bh = bulbH(), m = pearlMix(t, 0);
+  c.save(); c.globalCompositeOperation = 'lighter'; c.lineWidth = 2.6;
+  for (let i = 0; i < s.tubes.length; i++){
+    if (i === G.sel || !s.tubes[i].length || !canMove(s, G.sel, i)) continue;
+    const d = topLamp(s.tubes[i]) & COLOR; if (top !== WILD && d !== WILD) continue;
+    const l = V.cont[i][V.cont[i].length - 1]; if (!l) continue;
+    c.globalAlpha = 0.5 + 0.4 * pulse; c.strokeStyle = top === WILD && d === WILD ? '#ffffff' : m.a;
+    c.beginPath(); c.arc(l.px, l.py + bh * 0.5, GEO.r * 1.4 + 2.5 * pulse, 0, Math.PI * 2); c.stroke();
+  }
+  c.restore();
+}
+// drawRays: искры тепла (см. ray) — яркая голова и гаснущий хвост по пологой дуге
+function drawRays(c, t){
+  G.rays = G.rays.filter(r => t < r.t0 + r.d + dur(180));
+  for (const r of G.rays){
+    const k = (t - r.t0) / r.d, out = k > 1 ? Math.max(0, 1 - (t - r.t0 - r.d) / dur(180)) : 1, arc = Math.min(40, Math.hypot(r.x1 - r.x0, r.y1 - r.y0) * 0.18);
+    for (let q = 0; q < 10; q++){
+      const kq = k - q * 0.045; if (kq < 0) break;
+      const e = easeIO(kq), x = r.x0 + (r.x1 - r.x0) * e, y = r.y0 + (r.y1 - r.y0) * e - arc * 4 * e * (1 - e);
+      glow(c, r.col, x, y, (30 - q * 2.2), (1 - q / 10) * 0.95 * out);
+      if (!q) glow(c, '#ffffff', x, y, 13, out);
     }
   }
-  if (I.kind === 'dark') for (const l of lamps(l => l.hid)){
-    ringAt(l.px, l.py + bh * 0.5, GEO.r * 1.5, '#ffffff');
-    glow(c, colorHex(Math.floor(t / dur(150) + l.id) % s.colors), l.px, l.py + bh * 0.55, GEO.r * 4.6, 0.55 * fade);       // стекло мерцает цветами: внутри любой из них
-  }
-  if (I.kind === 'wild'){
-    const js = lamps(l => l.col === WILD), tops = V.cont.map(arr => arr[arr.length - 1]).filter(l => l && l.col !== WILD), m = pearlMix(t, 0);
-    for (const l of js) ringAt(l.px, l.py + bh * 0.5, GEO.r * 1.6, m.a);
-    tops.forEach((l, q) => { if (k > 0.2 + 0.5 * q / Math.max(1, tops.length)) ringAt(l.px, l.py + bh * 0.5, GEO.r * 1.35, PEARL[q % PEARL.length]); });   // сядет к любому цвету
-  }
-  if (I.kind === 'sock') s.sock.forEach((col, i) => { if (col < 0 || !GEO.cont[i]) return; for (let j = (V.cont[i] || []).length; j < GEO.cont[i].cap; j++){ const p = slotPos(i, j); ringAt(p.x, p.y + bh * 0.5, GEO.r * 1.4, colorHex(col)); } });
-  if (I.kind === 'bird' && V.bird){ const p = wireEnd(V.bird.at); ringAt(p.x, p.y - CFG.BIRD_W * 0.42, CFG.BIRD_W * 0.62, PAL.warm);
-    if (k > 0.38 && k < 0.62){ const q = contCenter(V.bird.at), pk = (k - 0.38) / 0.24; drawTouch(c, q.x, q.y + 8, 0.9 * fade, Math.sin(pk * Math.PI)); } }
-  if (I.kind === 'gold') for (const l of lamps(l => l.gold)){ ringAt(l.px, l.py + bh * 0.42, GEO.r * 1.9, PAL.gold); ringAt(l.px, l.py - CFG.GOLD_BADGE_DY, CFG.GOLD_BADGE_R + 4, PAL.gold); }
 }
 // drawWire: провод варианта a — от стены к свободному концу, с провисом, патронами под лампы и «током» при сборе цвета.
 // Обледеневший провод — в ледяной корке с сосульками; провод с цветным патроном — скоба, патроны и силуэты ламп в его цвете.
@@ -1670,21 +1784,6 @@ function drawHint(c, t){
   else if (ph < 0.72){ const k = easeIO((ph - 0.28) / 0.44); drawTouch(c, A.x + (B.x - A.x) * k, A.y + (B.y - A.y) * k - 40 * Math.sin(k * Math.PI) + 8, 0.75, 0); }
   else drawTouch(c, B.x, B.y + 8, 0.9, Math.sin((ph - 0.72) / 0.28 * Math.PI));
 }
-// drawCoach: одна строка подсказки на первом уровне (без попапов)
-function coachText(){
-  const s = G.s; if (!s || s.li !== 0 || G.ending || isWin(s)) return '';
-  const a = s.v === 'a';
-  if (!s.done.length && s.moves === 0) return G.sel < 0 ? (a ? 'Тапни провод — крайние лампы снимутся' : 'Тапни колбу — верхняя лампа поднимется') : (a ? 'Теперь тапни провод, куда им лететь' : 'Теперь тапни колбу, куда её положить');
-  if (!s.done.length) return a ? 'Собери цвет на одном проводе — он загорится' : 'Собери цвет в одной колбе — она загорится';
-  return '';
-}
-function drawCoach(c, t){
-  const txt = coachText(); if (!txt) return;
-  c.save(); c.font = '800 16px Nunito, system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
-  const y = H - (G.s.v === 'a' ? CFG.A_BOTTOM : CFG.B_BOTTOM) - 26;
-  c.globalAlpha = 0.9; c.fillStyle = PAL.warm; c.fillText(txt, W / 2, y); c.restore();
-}
-
 function render(){
   const t = now();
   tick(t);
@@ -1693,7 +1792,7 @@ function render(){
   if (toastUntil && t > toastUntil){ $('toast').classList.add('hide'); toastUntil = 0; }
   const s = G.s; if (!s) return;
   const isA = s.v === 'a';
-  if (s.li === 0 && !G.hint && canInput() && t - G.idleT > dur(CFG.HINT_IDLE_MS) && !s.done.length) showHint(true);   // рука на первом уровне
+  if (!G.hint && !G.drag && canInput() && t - G.idleT > dur(G.sel >= 0 || (G.lesson && G.lesson.bump) ? CFG.HAND_SEL_MS : CFG.HINT_IDLE_MS)) autoHand(t);   // рука урока: первый уровень и первый шаг урока механики
   // 1. контейнеры
   if (isA){ drawTopWire(ctx); for (const g of GEO.cont) drawWire(ctx, g, t, g.i === GEO.ghost); }
   else for (const g of GEO.cont) drawTube(ctx, g, t, g.i === GEO.ghost);
@@ -1709,14 +1808,16 @@ function render(){
   for (const q of poses) if (q.front) drawBulb(ctx, q, t);
   drawBird(ctx, t);
   // 3. эффекты и подсказки
-  drawRings(ctx, t); drawParticles(ctx, t); drawIntro(ctx, t); drawHint(ctx, t); drawCoach(ctx, t);
+  drawRings(ctx, t); drawRays(ctx, t); drawParticles(ctx, t); drawSpot(ctx, t); drawLesson(ctx, t); drawHint(ctx, t);
   if (G.ending && t >= G.ending) finishWin();
 }
 
 // --- цикл: rAF + watchdog setInterval; безопасно, потому что время абсолютное (§4) ---
 let lastFrame = 0;
-function frame(){ lastFrame = performance.now(); if (!G.paused) render(); requestAnimationFrame(frame); }
-setInterval(() => { if (performance.now() - lastFrame > 120 && !G.paused) render(); }, 40);
+// Кадр под try/catch: одно исключение в отрисовке не останавливает игру (урок «Отряда НЛО»); ошибки считаются и пишутся в журнал.
+function safeRender(){ try { render(); } catch (e) { G.frameErrors++; const m = String(e && e.stack || e).slice(0, 300); if (m !== G.lastError){ G.lastError = m; console.error('[game] frame error: ' + m); } } }
+function frame(){ lastFrame = performance.now(); if (!G.paused) safeRender(); requestAnimationFrame(frame); }
+setInterval(() => { if (performance.now() - lastFrame > 120 && !G.paused) safeRender(); }, 40);
 
 // --- дебаг-хук (§6): состояние, любой экран, прогон времени, автоигра ---
 window.GIRLYANDA_SORT = {
@@ -1728,7 +1829,8 @@ window.GIRLYANDA_SORT = {
     return { screen: G.screen, variant: s.v, level: s.li + 1, tubes: s.tubes.map(word), raw: s.tubes.slice(), caps: s.caps.slice(), done: s.done.slice(), moves: s.moves, par: levelsOf(s.v)[s.li].par,
       spare: s.spare, sel: G.sel, win: isWin(s), stuck: isStuck(s), locked: now() < G.lockUntil, legal: legalMoves(s).length,
       mech: Object.keys(levelsOf(s.v)[s.li].mech || {}), bird: s.bird, ice: s.ice, sock: s.sock.slice(), gold: s.gold ? Object.assign({}, s.gold) : null, last: s.last ? Object.assign({}, s.last) : null,
-      intro: G.intro ? G.intro.kind : '', seen: Object.assign({}, G.save.seen), goldLevels: Object.keys(G.save.gold[s.v]).length };
+      spot: G.spot ? G.spot.kind : '', lesson: G.lesson ? { keys: G.lesson.keys.filter(k => !learned(k)), bump: G.lesson.bump } : null, hand: G.hint && G.hint.auto ? { a: G.hint.a, b: G.hint.b } : null,
+      seen: Object.assign({}, G.save.seen), goldLevels: Object.keys(G.save.gold[s.v]).length, frameErrors: G.frameErrors, lastError: G.lastError };
   },
   play(n, v){ startLevel(Math.max(1, n || 1) - 1, v); return this.state(); },
   variant(v){ setVariant(v); G.s = null; goto('menu'); return G.v; },
@@ -1750,7 +1852,23 @@ window.GIRLYANDA_SORT = {
     const c = contCenter(idx); return { x: Math.round(r.left + c.x * scale), y: Math.round(r.top + c.y * scale) };
   },
   goto(screen){ route(screen); return G.screen; },
-  intro(kind){ const L = G.s ? levelsOf(G.s.v)[G.s.li] : null, k = kind || (L && (L.intro || Object.keys(L.mech || {})[0])); if (k) introShow(k, true); return G.intro ? G.intro.kind : ''; },   // первый показ механики ещё раз
+  spot(kind){ const L = G.s ? levelsOf(G.s.v)[G.s.li] : null, k = kind || (L && (L.intro || Object.keys(L.mech || {})[0])); if (k) spot(k, true); return G.spot ? G.spot.kind : ''; },   // блик механики ещё раз
+  lessonMove(){ return lessonMove(); },
+  // probe(): сверка для стенда касаний — визуальная модель против ядра, выбор, рука урока. Возвращает список расхождений (пусто = всё сходится).
+  probe(){
+    const s = G.s, out = []; if (!s) return out;
+    const calm = now() >= G.lockUntil && !G.ending;       // пока гирлянда собирается и улетает, её лампы ещё висят на проводе — сверять рано
+    if (V.cont.length !== s.tubes.length) out.push('контейнеров ' + V.cont.length + ' ≠ ' + s.tubes.length);
+    if (calm) s.tubes.forEach((str, i) => { const arr = V.cont[i] || []; if (arr.length !== str.length) out.push('провод ' + i + ': ламп ' + arr.length + ' ≠ ' + str.length); else for (let j = 0; j < str.length; j++) if (arr[j].col !== colAt(str, j)) out.push('провод ' + i + ':' + j + ' цвет'); });
+    for (const arr of V.cont) for (const l of arr) if (!isFinite(l.px) || !isFinite(l.py)) out.push('лампа без места');
+    if (G.sel >= s.tubes.length || (G.sel >= 0 && !s.tubes[G.sel].length)) out.push('выбран пустой или несуществующий провод ' + G.sel);
+    if (G.sel < 0 && !G.drag) for (const arr of V.cont) for (const l of arr) if (l.lift.b > 0) out.push('лампа осталась приподнятой');
+    if (G.hint && G.hint.auto && !canMove(s, G.hint.a, G.hint.b)) out.push('рука урока показывает невозможный ход ' + G.hint.a + '>' + G.hint.b);
+    if (V.bird && !flyingBird() && now() >= G.lockUntil && V.bird.at !== s.bird) out.push('птица нарисована на ' + V.bird.at + ', в ядре ' + s.bird);
+    if (G.frameErrors) out.push('ошибок кадра ' + G.frameErrors + ': ' + G.lastError);
+    return out;
+  },                                    // какой ход показала бы рука урока сейчас
+  forget(kind){ if (kind) delete G.save.seen[kind]; else G.save.seen = {}; save(); return Object.assign({}, G.save.seen); },   // забыть уроки (все или один) — пройти обучение заново
   why(a, b){ return G.s ? (b === undefined ? liftWhy(a) : whyNot(G.s, posOf(G.s), a, b)) : ''; },
   drive(sec){                                   // ручной прогон игрового времени: rAF заморожен в скрытой вкладке
     const steps = Math.ceil(sec * 1000 / 16);
