@@ -79,7 +79,16 @@ button.big{font-size:20px;padding:14px 34px;border-radius:20px}
 .levels.many{grid-template-columns:repeat(6,1fr);gap:5px;margin:10px 0 2px}
 .levels.many button{font-size:15px;min-height:37px;padding:5px 0 3px;border-radius:11px}
 .levels button.gold{box-shadow:inset 0 0 0 2px var(--gold)}
-.levels button.new{background:#4a3a86}                 /* уровень, где впервые встречается механика */
+.levels button.new{background:#4a3a86;position:relative}  /* уровень, где впервые встречается механика: в углу её значок */
+.levels .mi{position:absolute;right:-2px;top:-6px;width:17px;height:17px;object-fit:contain;filter:drop-shadow(0 1px 1px rgba(0,0,0,.6))}
+.levels i.mi{width:11px;height:11px;right:0;top:-4px;border-radius:4px;background:linear-gradient(#ff4f5e,#b77bff);box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.4)}
+.goldrow.total{margin:8px 0 2px;font-size:14px} .goldrow.total img{width:20px;height:20px}
+.cheat.sure{border-style:solid;border-color:var(--danger);color:var(--danger)}
+/* лампочка-подсказка мигает, когда игрок давно не ходил; толчок кнопки запасного провода при первом показе. Обе анимации стартуют с видимого состояния (§9) */
+.ib.nudge{animation:nudge 1.5s ease-in-out infinite} .ib.nudge svg{stroke:var(--accent)}
+@keyframes nudge{0%,100%{box-shadow:0 0 0 0 rgba(255,207,51,0)}50%{box-shadow:0 0 0 6px rgba(255,207,51,.3)}}
+footer button.pulse{animation:pulse .8s ease-in-out 2}
+@keyframes pulse{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(255,241,194,0)}50%{transform:scale(1.09);box-shadow:0 0 0 7px rgba(255,241,194,.28)}}
 .goldrow{display:flex;align-items:center;justify-content:center;gap:8px;margin:-4px 0 12px;color:var(--gold);font-weight:900}
 .goldrow img{width:24px;height:24px;object-fit:contain}
 .goldrow.miss{color:var(--muted)} .goldrow.miss img{filter:grayscale(1);opacity:.55}
@@ -101,7 +110,7 @@ button.big{font-size:20px;padding:14px 34px;border-radius:20px}
 #toast{position:absolute;left:50%;top:calc(60px + env(safe-area-inset-top));transform:translateX(-50%);background:rgba(255,248,230,.96);color:var(--ink-dark);padding:9px 16px;border-radius:14px;
   pointer-events:none;opacity:.98;transition:opacity .25s;white-space:nowrap;z-index:4;font-weight:900;font-size:14px}
 #toast.hide{opacity:0}
-@media (prefers-reduced-motion: reduce){ .card,.star.on{animation:none} #toast{transition:none} }
+@media (prefers-reduced-motion: reduce){ .card,.star.on,.ib.nudge,footer button.pulse{animation:none} .ib.nudge{box-shadow:0 0 0 4px rgba(255,207,51,.3)} #toast{transition:none} }
 </style>
 </head>
 <body>
@@ -185,8 +194,8 @@ const CFG = {
   KISS_MS: 420,           // «поцелуй» совпавших ламп
   SWING_MS: 900,          // качание после посадки
   LIT_MS: 260,            // разгорание/затухание
-  WAVE_STEP_MS: 85,       // волна по собранному контейнеру: шаг на лампу
-  DONE_HOLD_MS: 420,      // пауза после волны перед уходом гирлянды / крышкой
+  WAVE_STEP_MS: 70,       // волна по собранному контейнеру: шаг на лампу
+  DONE_HOLD_MS: 340,      // пауза после волны перед уходом гирлянды / крышкой (ввод при этом не заперт — см. doMove)
   LEAVE_MS: 520,          // полёт лампы на итоговую гирлянду
   LEAVE_STAGGER_MS: 60,
   CAP_MS: 260,            // крышка садится на колбу
@@ -196,6 +205,10 @@ const CFG = {
   SPARE_FROM_LEVEL: 4,    // с какого уровня виден запасной контейнер (на первых трёх — только то, что нужно для урока; из карточки «Ходов нет» он доступен всегда)
   HINT_SHOW_MS: 5200,     // сколько висит подсказка по кнопке
   BAD_MS: 320,            // тряска при неверном ходе
+  NO_MS: 460,             // отказ на чужой цвет: две несовпавшие лампы качают «нет» и показывают свои цвета кольцами
+  KICK_MS: 900,           // пружинка провода: сколько он качается после посадки, снятия и ухода гирлянды
+  SHAKE_MS: 300,          // тряска кадра на аккорде собранной гирлянды
+  NUDGE_IDLE_MS: 9000,    // через сколько без ввода начинает мигать лампочка-подсказка в шапке (руки без урока нет)
   TOAST_MS: 1700,         // сколько висит тост
   // --- механики: вид и тайминги ---
   FROST_A: 0.62,           // плотность инея поверх лампы; середина стекла у корки почти чистая (frostSprite), цвет под ней читается
@@ -209,8 +222,8 @@ const CFG = {
   BIRD_HOP_MS: 420,       // птица подпрыгивает, когда трогают её провод
   BIRD_ARC_MS: 1600,      // сколько виден пунктир «куда полетит»
   GOLD_SOCKET_W: 0.8,    // ширина золотого патрона в ширинах спрайта лампы
-  GOLD_BADGE_R: 10.5,      // радиус счётчика золотой лампы
-  GOLD_BADGE_DY: 15,      // счётчик — над проводом, на столько выше подвеса
+  GOLD_BADGE_R: 13,       // радиус счётчика золотой лампы
+  GOLD_BADGE_DY: 18,      // счётчик — над проводом, на столько выше подвеса
   GOLD_WARN: 3,           // с какого числа счётчик тревожится
   GOLD_TICK_MS: 460,      // счётчик на каждый ход: толчок, старое число уезжает вверх
   GOLD_LOST_MS: 560,      // золотой патрон гаснет
@@ -641,7 +654,12 @@ const G = {
   ending: 0,                     // когда показать карточку победы, 0 = не ждём
   hint: null,                    // { a, b, t0, until, auto }
   idleT: 0,                      // время последнего ввода (для руки на 1-м уровне)
-  bad: null,                     // { ci, t0 } — тряска при неверном ходе
+  bad: null,                     // { ci, t0 } — тряска при неверном ходе (птица, лёд, патрон)
+  no: null,                      // { a, b, t0, why, la, lb } — мягкий отказ: чужой цвет или нет места (см. noFx)
+  flash: null,                   // { t0, d, col, x, y, a } — свет собранной гирлянды заливает сцену
+  shake: null,                   // { t0, amp } — тряска кадра на аккорде
+  floats: [],                    // всплывающие награды на месте: [{ x, y, t0, d, text }]
+  inputT: 0, nudge: false,       // время последнего действия игрока; мигает ли лампочка-подсказка в шапке
   spot: null,                    // { kind, t0, until } — блик новой механики (ввод не блокирует)
   lesson: null,                  // { keys, bump } — непрожитые уроки механик этого уровня; bump — во что игрок упёрся
   handCache: null,               // { key, m } — ход руки урока для текущей позиции
@@ -661,9 +679,13 @@ const G = {
 // Визуальная модель: лампы-объекты по контейнерам (зеркало s.tubes), итоговая гирлянда (вариант a), крышки (вариант b).
 // Механики: bird — { at, from, t0, d } (птица и её перелёт), iceWire — обледеневший провод, iceWireT — когда он оттаял,
 // birdHopT/birdArcT/sockFlashT/goldTickT — моменты откликов (подпрыгнула, пунктир «куда полетит», вспышка силуэтов, толчок счётчика).
-const V = { cont: [], top: [], capT: {}, goldT: {}, bornT: {}, bird: null, iceWire: -1, iceWireT: {}, birdHopT: -1e9, birdArcT: -1e9, sockFlashT: -1e9, goldTickT: -1e9, goldPrev: -1 };
+// gone — собранные гирлянды, которые ещё доигрывают сбор на своём проводе: [{ ci, arr, go, left, rush }]. Ядро провод уже освободило,
+// V.cont[ci] тоже пуст — следующий ход можно начинать сразу; pending — сколько сборов ещё не доиграно (победа ждёт нуля).
+// kick — пружинка провода { t0, amp }; curT — «ток» по проводу; spareT — блик запасного провода; birdDue — к какому времени птица долетит.
+const V = { gone: [], pending: 0, kick: {}, curT: {}, spareT: -1e9, birdDue: 0, cont: [], top: [], capT: {}, goldT: {}, bornT: {}, bird: null, iceWire: -1, iceWireT: {}, birdHopT: -1e9, birdArcT: -1e9, sockFlashT: -1e9, goldTickT: -1e9, goldPrev: -1 };
 const GEO = { cont: [], ghost: -1, r: CFG.BULB_R, rowH: 80, k: 1, slot: CFG.B_SLOT, tw: CFG.B_TUBE_W };
 
+const REDUCED = (() => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } })();   // без тряски кадра и пружинки
 const dur = (ms) => ms / G.timeScale;
 const fxRnd = () => mulberry32(G.fxSeed++ * 7919);
 const clamp01 = (k) => Math.max(0, Math.min(1, k));
@@ -743,7 +765,8 @@ const Sound = {
   },
   note(step){ return 523.25 * Math.pow(2, PENTA[Math.max(0, Math.min(Math.round(step) || 0, PENTA.length - 1))] / 12); },
   ui(){ this.tone(640, 50, 'triangle', 0.06); log('sound', 'ui'); },
-  pick(){ this.hiss(28, 'bandpass', 2600, 0.16, 0, 3); this.tone(430, 70, 'triangle', 0.07, 0, 580); log('sound', 'pick'); },
+  pick(n){ const f = 392 * Math.pow(2, PENTA[Math.max(0, Math.min((n || 1) - 1, 4))] / 12); this.hiss(28, 'bandpass', 2600, 0.16, 0, 3); this.tone(f, 70, 'triangle', 0.07, 0, f * 1.35); log('sound', 'pick'); },   // чем больше ламп снялось — тем выше
+  fly(n){ this.hiss(150 + 40 * Math.min(n, 4), 'bandpass', 1300, 0.045, 0, 0.7); this.tone(300, 150, 'sine', 0.022, 0, 640); log('sound', 'fly'); },   // взлёт группы: мягкий «фух»
   land(step){ this.hiss(20, 'bandpass', 2200, 0.3, 0, 4); this.tone(150, 80, 'sine', 0.16, 0, 80); this.bell(this.note(step), 0.01, 0.055); log('sound', 'land'); },
   kiss(size){                          // «поцелуй»: парный аккорд совпавших ламп (чем длиннее группа — тем выше), искра тока, блёстки
     const b = 1 + size * 2;
@@ -753,11 +776,13 @@ const Sound = {
     log('sound', 'kiss', 'size=' + size);
   },
   waveNote(j){ this.bell(this.note(3 + j), 0, 0.09); },
-  complete(){ [0, 4, 7, 12].forEach(s => this.tone(261.63 * Math.pow(2, s / 12), 1300, 'triangle', 0.05, 0, 0, true)); this.hiss(520, 'bandpass', 3200, 0.1, 0, 1.5); log('sound', 'complete'); },
+  complete(k){ const up = PENTA[Math.max(0, Math.min(k || 0, 5))]; [0, 4, 7, 12].forEach(s => this.tone(261.63 * Math.pow(2, (s + up) / 12), 1300, 'triangle', 0.05, 0, 0, true));   // каждая следующая гирлянда уровня — аккорд выше
+    this.hiss(520, 'bandpass', 3200, 0.1, 0, 1.5); log('sound', 'complete'); },
   leave(){ this.hiss(420, 'highpass', 2500, 0.08); this.tone(480, 380, 'sine', 0.05, 0, 1500); log('sound', 'leave'); },
   ting(k){ this.bell(this.note(7 + (k % 5)), 0, 0.04); },
   cap(){ this.tone(220, 120, 'sine', 0.2, 0, 110); this.hiss(40, 'bandpass', 1500, 0.3, 0, 2); this.bell(this.note(9), 0.05, 0.07); log('sound', 'cap'); },
-  bad(){ this.tone(150, 170, 'triangle', 0.2, 0, 105); this.hiss(60, 'lowpass', 500, 0.15); log('sound', 'bad'); },
+  bad(){ this.tone(196, 90, 'sine', 0.12, 0, 165); this.tone(156, 130, 'sine', 0.1, 0.085, 131); this.hiss(40, 'lowpass', 700, 0.06); log('sound', 'bad'); },   // мягкое «не-а»: два глухих тука вниз, не зуммер
+  full(){ this.tone(131, 110, 'sine', 0.14, 0, 98); this.hiss(50, 'lowpass', 500, 0.09); log('sound', 'full'); },   // нет места: один глухой стук
   undo(){ this.tone(560, 130, 'triangle', 0.09, 0, 300); log('sound', 'undo'); },
   spare(){ this.tone(300, 240, 'triangle', 0.09, 0, 900); this.bell(this.note(6), 0.16, 0.06); log('sound', 'spare'); },
   stuck(){ this.bell(392, 0, 0.07); this.bell(330, 0.22, 0.07); log('sound', 'stuck'); },
@@ -796,13 +821,16 @@ function goto(screen, payload){
     let lv = '';
     for (let i = 0; i < LV.length; i++){
       const st = G.save.best[G.v][i] || 0;
-      lv += isOpen(i) ? `<button data-act="lvl" data-li="${i}" class="${i === cur ? 'cur' : ''}${G.save.gold[G.v][i] ? ' gold' : ''}${LV[i].intro ? ' new' : ''}">${i + 1}<small>${st ? '<i class="dot"></i>'.repeat(st) : '&nbsp;'}</small></button>`
+      const mi = LV[i].intro ? (MECH_ICON[LV[i].intro] ? `<img class="mi" src="assets/${MECH_ICON[LV[i].intro]}.png" alt="">` : '<i class="mi"></i>') : '';   // значок механики, которая здесь появляется
+      lv += isOpen(i) ? `<button data-act="lvl" data-li="${i}" class="${i === cur ? 'cur' : ''}${G.save.gold[G.v][i] ? ' gold' : ''}${LV[i].intro ? ' new' : ''}">${mi}${i + 1}<small>${st ? '<i class="dot"></i>'.repeat(st) : '&nbsp;'}</small></button>`
                       : `<button data-act="lvl" data-li="${i}" class="locked"><i class="lock"></i></button>`;
     }
+    const goldAll = LV.filter(L => L.mech && L.mech.gold).length, goldN = Object.keys(G.save.gold[G.v]).length, goldFrom = LV.findIndex(L => L.mech && L.mech.gold);
+    const goldRow = goldAll && isOpen(goldFrom) ? `<div class="goldrow total"><img src="assets/spark-gold.png" alt="">Золотые лампы: ${goldN} из ${goldAll}</div>` : '';   // куда складывается награда золотой
     card.innerHTML = `<div class="logo">Гирлянда</div><div class="sub">сортировка лампочек</div>
       <div class="seg">${['a', 'b'].map(v => `<button data-act="var" data-v="${v}" class="${v === G.v ? 'on' : ''}">${RULES[v].title}<small>${RULES[v].hint}</small></button>`).join('')}</div>
       <button class="primary big" data-act="play">Играть · ${cur + 1}</button>
-      <div class="levels${LV.length > 10 ? ' many' : ''}">${lv}</div>
+      <div class="levels${LV.length > 10 ? ' many' : ''}">${lv}</div>${goldRow}
       <div class="row"><button data-act="help">Как играть</button></div>
       <div class="row">${G.save.unlockAll ? '<button class="cheat" data-act="relock">Чит включён · закрыть обратно</button>' : '<button class="cheat" data-act="unlock">Чит: открыть все уровни</button>'}
       <button class="cheat" data-act="wipe">Сбросить прогресс</button></div>`;
@@ -817,7 +845,7 @@ function goto(screen, payload){
   if (screen === 'win'){
     const p = payload || demoWin(), last = p.li >= LV.length - 1, other = G.v === 'a' ? 'b' : 'a';
     const goldRow = p.gold ? `<div class="goldrow${p.gold === 1 ? '' : ' miss'}"><img src="assets/socket-gold.png" alt="">${p.gold === 1 ? 'Золотая лампа собрана' : 'Золотая лампа погасла'}</div>` : '';
-    card.innerHTML = `<h2>${G.v === 'a' ? 'Гирлянда горит!' : 'Все колбы светятся!'}</h2>${starsHtml(p.stars)}${goldRow}<p>Ходов ${p.moves} · лучший результат ${p.par}</p>
+    card.innerHTML = `<h2>${G.v === 'a' ? 'Гирлянда горит!' : 'Все колбы светятся!'}</h2>${starsHtml(p.stars)}${goldRow}<p>Ходов ${p.moves} · минимум ${p.par}</p>
       <div class="row">${last ? `<button class="primary big" data-act="var-play" data-v="${other}">Попробовать «${RULES[other].title}»</button><button data-act="menu">Меню</button>`
                                : '<button class="primary big" data-act="next">Дальше</button>'}</div>`;
   }
@@ -850,6 +878,7 @@ $('card').addEventListener('click', (e) => {
   else if (act === 'var-play'){ setVariant(b.dataset.v); startLevel(Math.min(G.save.level[G.v], levelsOf(G.v).length - 1)); }
   else if (act === 'lvl'){ const li = +b.dataset.li; if (isOpen(li)) startLevel(li); else toast('Сначала пройди уровень ' + (G.save.level[G.v] + 1)); }
   else if (act === 'unlock' || act === 'relock'){ setUnlockAll(act === 'unlock'); goto('menu'); }
+  else if (act === 'wipe' && !b.classList.contains('sure')){ b.classList.add('sure'); b.textContent = 'Точно сбросить?'; setTimeout(() => { if (b.isConnected){ b.classList.remove('sure'); b.textContent = 'Сбросить прогресс'; } }, 3000); }   // сброс — в два тапа
   else if (act === 'wipe'){ const m = G.save.muted, v = G.v; G.save = freshSave(); G.save.muted = m; G.save.v = v; save(); G.s = null; log('event', 'wipe'); goto('menu'); }
   else if (act === 'undo'){ goto('game'); undo(); }
   else if (act === 'spare'){ goto('game'); useSpare(); }
@@ -882,7 +911,7 @@ function layout(){
     // провода растут от левой и правой стены в шахматном порядке, как ветки
     const rows = Math.ceil(N / 2), top = CFG.A_TOP, bottom = H - CFG.A_BOTTOM;
     const rowH = Math.max(CFG.A_ROW_MIN, Math.min(CFG.A_ROW_MAX, (bottom - top) / (rows + 0.5)));
-    const y0 = top + Math.max(0, (bottom - top - (rows + 0.5) * rowH) * 0.4);
+    const y0 = top + Math.max(0, (bottom - top - (rows + 0.5) * rowH) * 0.5);     // поле по центру свободной высоты: ближе к большому пальцу, чем к шапке
     GEO.r = CFG.BULB_R; GEO.rowH = rowH; GEO.k = 1;
     for (let i = 0; i < N; i++){
       const side = i % 2, row = (i - side) / 2, cap = capOf(i), step = cap >= 5 ? CFG.A_STEP5 : CFG.A_STEP;
@@ -904,7 +933,10 @@ function layout(){
   }
 }
 const bulbH = () => GEO.r * CFG.BULB_H_K;
-function wireY(c, d){ const u = d / c.len; return c.y + 4 * CFG.A_SAG * u * (1 - u); }       // провис провода
+// Пружинка: провод качается после посадки, снятия ламп и ухода гирлянды — затухающая синусоида поверх провиса (лампы висят на нём и качаются вместе).
+function sagOf(i){ const k = V.kick[i]; if (!k) return CFG.A_SAG; const tau = (now() - k.t0) / dur(CFG.KICK_MS); if (tau >= 1){ delete V.kick[i]; return CFG.A_SAG; } return CFG.A_SAG + k.amp * Math.exp(-4.5 * tau) * Math.sin(tau * 17); }
+function kick(i, amp){ if (G.s && G.s.v === 'a' && i >= 0) V.kick[i] = { t0: now(), amp: REDUCED ? 0 : amp }; }
+function wireY(c, d){ const u = d / c.len; return c.y + 4 * sagOf(c.i) * u * (1 - u); }       // провис провода
 // slotPos: точка подвеса лампы (цоколь) в ячейке si контейнера ci
 function slotPos(ci, si){
   const c = GEO.cont[ci]; if (!c) return { x: W / 2, y: H / 2 };
@@ -950,12 +982,13 @@ let lampSeq = 0;
 function mkLamp(v, ci, si){
   return { id: lampSeq++, col: v & COLOR, ice: !!(v & ICE), hid: !!(v & HID), gold: !!(v & GOLD), iceT: -1e9, revT: -1e9, goldT: -1e9,
     ci, si, top: -1, landed: true, fly: null, flyId: 0, lift: tw(0), lit: tw(0), sc: tw(1),
-    landT: -1e9, landDir: 1, kissT: -1e9, kissDir: 0, flashT: -1e9, flashK: 0, px: 0, py: 0, dragX: null, dragY: null };
+    landT: -1e9, landDir: 1, kissT: -1e9, kissDir: 0, flashT: -1e9, flashK: 0, popT: -1e9, popK: 0, noT: -1e9, grp: null, px: 0, py: 0, dragX: null, dragY: null };   // popT/popK — толчок масштаба, noT — качает «нет», grp — гирлянда, в которой лампа доигрывает сбор
 }
 // яркость лампы по длине её группы: одиночная не горит, пара загорается, собранный цвет — в полную силу
 function litLevel(L, per){ return L < 2 ? CFG.LIT_SINGLE : CFG.LIT_PAIR + (1 - CFG.LIT_PAIR) * (L - 2) / Math.max(1, per - 2); }
-function relight(ci, t, instant){
-  const arr = V.cont[ci]; if (!arr) return;
+function relight(ci, t, instant){ relightArr(V.cont[ci], t, instant); }
+function relightArr(arr, t, instant){
+  if (!arr) return;
   let n = 0; while (n < arr.length && arr[n].landed) n++;          // летящие лампы — в хвосте, в группы пока не входят
   for (let j = 0; j < n;){
     let e = j; while (e + 1 < n && arr[e + 1].col === arr[j].col && !arr[e + 1].hid && !arr[e].hid) e++;    // тёмная не выдаёт цвет: с соседкой не загорается
@@ -969,7 +1002,7 @@ function relight(ci, t, instant){
 function syncVisual(){
   const s = G.s, t = now();
   V.cont = s.tubes.map((str, i) => Array.from(str, (ch, j) => { const l = mkLamp(lampAt(str, j), i, j); if (i === s.ice) l.ice = true; return l; }));   // на обледеневшем проводе в инее все лампы
-  V.top = []; V.capT = {}; V.goldT = {}; V.bornT = {};
+  V.top = []; V.capT = {}; V.goldT = {}; V.bornT = {}; V.gone = []; V.pending = 0; V.kick = {}; V.curT = {}; V.birdDue = 0; G.no = null; G.inputT = t;
   V.bird = s.bird >= 0 ? { at: s.bird, from: -1, t0: 0, d: 1 } : null; V.iceWire = s.ice; V.iceWireT = {}; G.spot = null; G.rays = []; G.handCache = null;
   if (RULES[s.v].leave) s.done.forEach((col) => { const n = perOf(s, col); for (let j = 0; j < n; j++){ const l = mkLamp(col, -1, 0); l.top = V.top.length; l.lit = tw(1); l.sc = tw(CFG.TOP_SCALE); V.top.push(l); } });
   else s.tubes.forEach((str, i) => { if (isComplete(str, s.per)) V.capT[i] = -1e9; });
@@ -999,7 +1032,7 @@ function lampPose(l, t){
     if (isA){ y -= CFG.A_LIFT * lift - Math.sin(t / 260 + l.id) * 1.6 * lift; sc *= 1 + 0.1 * lift; }
     else if (l.top < 0){ y -= (base.y - mouthPos(l.ci).y) * lift - Math.sin(t / 260) * 1.6 * lift; }
   }
-  if (G.drag && l.ci === G.sel && l.top < 0 && l.si >= V.cont[l.ci].length - G.selN){     // перетаскивание: группа веером над пальцем
+  if (G.drag && l.ci === G.sel && l.top < 0 && !l.grp && l.si >= V.cont[l.ci].length - G.selN){     // перетаскивание: группа веером над пальцем
     const q = l.si - (V.cont[l.ci].length - G.selN), n = G.selN;
     const tx = G.drag.x + (q - (n - 1) / 2) * GEO.r * 2.1, ty = G.drag.y - bulbH() - 26;
     l.dragX = l.dragX === null ? x : l.dragX + (tx - l.dragX) * 0.4; l.dragY = l.dragY === null ? y : l.dragY + (ty - l.dragY) * 0.4;
@@ -1016,6 +1049,10 @@ function lampPose(l, t){
     if (isA) ang -= l.kissDir * 0.36 * w; else { y += l.kissDir * 3 * w; }
     sc *= 1 + 0.13 * w;
   }
+  const pk = (t - l.popT) / dur(260);                                       // толчок масштаба: волна сбора, прилёт на итоговую гирлянду
+  if (pk >= 0 && pk < 1) sc *= 1 + l.popK * Math.sin(pk * Math.PI);
+  const nk = (t - l.noT) / dur(CFG.NO_MS);                                  // «нет»: лампа качает головой
+  if (nk >= 0 && nk < 1){ const w = Math.sin(nk * Math.PI * 4) * (1 - nk); if (isA) ang += 0.3 * w; else x += 4 * w; }
   if (G.bad && l.ci === G.bad.ci){ const bk = (t - G.bad.t0) / dur(CFG.BAD_MS); if (bk < 1) x += Math.sin(bk * Math.PI * 6) * 4 * (1 - bk); else G.bad = null; }
   if (isA && l.top < 0) ang += 0.028 * Math.sin(t / 850 + l.id * 1.9);     // лёгкое живое покачивание
   l.px = x; l.py = y;
@@ -1046,7 +1083,7 @@ function ring(x, y, col, r0, r1, ms, lw){ G.rings.push({ x, y, col, r0, r1, t0: 
 function startLevel(li, v){
   if (v) setVariant(v);
   li = Math.max(0, Math.min(levelsOf(G.v).length - 1, li | 0));
-  G.s = createState(li, G.v); G.parts = []; G.rings = []; G.ending = 0; G.winT = -1e9;
+  G.s = createState(li, G.v); G.parts = []; G.rings = []; G.floats = []; G.flash = null; G.shake = null; G.ending = 0; G.winT = -1e9;
   syncVisual();
   const L = levelsOf(G.v)[li];
   log('event', 'level.start', 'v=' + G.v + ' level=' + (li + 1) + ' par=' + L.par + (L.mech ? ' mech=' + Object.keys(L.mech).filter(k => MECH[k]).join('+') : ''));
@@ -1060,28 +1097,33 @@ function hud(){
   $('btn-mute').classList.toggle('off', !!G.save.muted);
   $('spare-label').textContent = RULES[v].unit;
   $('btn-spare').disabled = !s || s.spare >= CFG.SPARE_PER_LEVEL;
-  $('btn-spare').style.visibility = s && !spareOpen(s) && !s.spare ? 'hidden' : '';
+  $('btn-spare').style.display = s && !spareOpen(s) && !s.spare ? 'none' : '';       // на первых уровнях кнопки нет вовсе — «Отмена» стоит по центру
   $('btn-undo').disabled = !s || !s.hist.length;
 }
 const canInput = () => G.s && G.screen === 'game' && !G.ending && now() >= G.lockUntil;
 // liftWhy: почему с провода нельзя снять лампы — 'bird' | 'ice' | 'frost' | '' (можно или провод пуст)
 function liftWhy(ci){ const s = G.s, t = s.tubes[ci]; if (!t || !t.length) return ''; return s.bird === ci ? 'bird' : s.ice === ci ? 'ice' : (topLamp(t) & ICE) ? 'frost' : ''; }
 const liftable = (ci) => ci >= 0 && G.s.tubes[ci] && G.s.tubes[ci].length > 0 && !liftWhy(ci) && !(!RULES[G.s.v].leave && isComplete(G.s.tubes[ci], G.s.per));
-function noteInput(){ G.idleT = now(); if (G.hint && G.hint.auto) G.hint = null; }
+function noteInput(){ G.idleT = G.inputT = now(); if (G.hint && G.hint.auto) G.hint = null; }
 function select(ci, quiet){
   const t = now();
   for (const l of selLamps()) twTo(l.lift, 0, t, 140);
   G.sel = ci; G.selN = 0;
   if (ci >= 0){
+    settle(ci);
     G.selN = RULES[G.s.v].group ? topRun(G.s.tubes[ci]) : 1;
     for (const l of selLamps()) twTo(l.lift, 1, t, 150);
-    if (!quiet) Sound.pick();
+    kick(ci, -2.2);                                        // провод облегчённо подпрыгивает
+    if (!quiet) Sound.pick(G.selN);
     buzz(8); log('input', 'select', 'c=' + ci + ' n=' + G.selN);
   }
 }
-// bad: отказ — тряска провода и отклик по причине: птица чирикает и показывает, куда полетит; лёд звенит; патрон вспыхивает силуэтами
-function bad(ci, why){
-  G.bad = { ci, t0: now() }; buzz(30); log('fx.start', 'bad', 'c=' + ci + (why ? ' why=' + why : ''));
+// bad: отказ — отклик по причине: птица чирикает и показывает, куда полетит; лёд звенит; патрон вспыхивает силуэтами (провод трясётся);
+// чужой цвет или нет места — мягко, без тряски: видно, какие две лампы не сошлись (noFx). from — провод, с которого несли лампы.
+function bad(ci, why, from){
+  const soft = why === 'color' || why === 'full';
+  if (soft) noFx(from === undefined ? G.sel : from, ci, why); else G.bad = { ci, t0: now() };
+  buzz(soft ? 12 : 30); log('fx.start', 'bad', 'c=' + ci + (why ? ' why=' + why : ''));
   const bk = why === 'frost' ? 'frost' : why === 'ice' ? 'iceWire' : why === 'bird' ? 'bird' : '';
   if (bk && G.lesson && G.lesson.keys.includes(bk) && !learned(bk)){ G.lesson.bump = bk; G.idleT = now(); log('event', 'lesson.bump', bk); }   // упёрся в непрожитую механику — рука покажет выход, если он в одном ходе
   if (why === 'bird'){ V.birdHopT = V.birdArcT = now(); Sound.chirp(); }
@@ -1090,7 +1132,26 @@ function bad(ci, why){
     Sound.iceTap(); burst(p.x, p.y, ['#ffffff', PAL.ice], 8, 90, { life: 420, size: 5, g: 120 });
   }
   else if (why === 'sock'){ V.sockFlashT = now(); Sound.sockNo(); }
+  else if (why === 'full') Sound.full();
   else Sound.bad();
+}
+// noFx: мягкий отказ. Чужой цвет — поднятая лампа и крайняя на проводе качают «нет», вокруг каждой кольцо её цвета (drawNo): видно, что не сошлось.
+// Нет места — лампы провода коротко сжимаются, у свободного конца кольцо.
+function noFx(a, b, why){
+  const t = now(), A = V.cont[a] || [], B = V.cont[b] || [], la = A[A.length - 1] || null, lb = B[B.length - 1] || null;
+  G.no = { a, b, t0: t, why, la, lb };
+  if (why === 'full') B.forEach(l => { l.popT = t; l.popK = -0.1; });
+  else { if (la) la.noT = t; if (lb) lb.noT = t; }
+}
+// settle: игрок тронул провод, на котором эффект ещё не доигран (ядро уже впереди: иней растаял, птица улетела) — доиграть сразу,
+// чтобы картинка не спорила с правилом. Гирлянда, которая ещё висит на проводе, улетает немедленно.
+function settle(ci){
+  const s = G.s; if (!s || ci < 0 || !V.cont[ci]) return;
+  for (const q of V.gone) if (q.ci === ci){ if (q.go) q.go(); else q.rush = true; }
+  if (s.ice < 0 && V.iceWire === ci) meltWire(ci);
+  const str = s.tubes[ci] || '';
+  V.cont[ci].forEach((l, j) => { if (l.ice && s.ice !== ci && j < str.length && !(lampAt(str, j) & ICE)) meltLamp(l); });
+  if (V.bird && V.bird.at !== s.bird && (ci === V.bird.at || ci === s.bird)) birdFly(s.bird);
 }
 // Тап по контейнеру: выбрать, снять выбор, перенести или переключить выбор.
 function tapContainer(ci){
@@ -1101,7 +1162,7 @@ function tapContainer(ci){
   if (G.sel < 0){ if (liftable(ci)) select(ci); else if (liftWhy(ci)) bad(ci, liftWhy(ci)); return true; }
   if (G.sel === ci){ select(-1); return true; }
   if (canMove(G.s, G.sel, ci)) return doMove(G.sel, ci);
-  bad(ci, whyNot(G.s, posOf(G.s), G.sel, ci));
+  bad(ci, whyNot(G.s, posOf(G.s), G.sel, ci), G.sel);
   if (liftable(ci)) select(ci, true); else select(-1);
   return false;
 }
@@ -1111,10 +1172,11 @@ function doMove(a, b){
   const s0 = G.s, n = canMove(s0, a, b);
   if (!n) return false;
   const t = now(), isA = s0.v === 'a';
+  settle(a); settle(b);
   G.s = applyMove(s0, { a, b });
   const last = G.s.last, src = V.cont[a], dst = V.cont[b];
   log('input', 'move', a + '>' + b + ' n=' + n + (last.completed ? ' completed' : ''));
-  G.sel = -1; G.selN = 0; G.hint = null; G.idleT = t;
+  G.sel = -1; G.selN = 0; G.hint = null; G.idleT = G.inputT = t;
   const flyMs = CFG.FLY_MS;
   for (let k = 0; k < n; k++){
     const l = src.pop(), p0 = l.dragX !== null ? { x: l.dragX, y: l.dragY } : lampPose(l, t);
@@ -1122,7 +1184,7 @@ function doMove(a, b){
     const id = startFly(l, p0, k * CFG.FLY_STAGGER_MS);
     after(k * CFG.FLY_STAGGER_MS + flyMs, () => { if (l.flyId === id) onLand(l); });
   }
-  log('fx.start', 'fly', 'n=' + n);
+  Sound.fly(n); log('fx.start', 'fly', 'n=' + n);
   if (last.reveal && src.length){ const rl = src[src.length - 1]; after(150, () => revealFx(rl)); }       // тёмная стала крайней — загорается цветом
   if (G.lesson) G.lesson.bump = '';
   // уроки: правило прожито, когда случилось событие, которое его показывает
@@ -1134,23 +1196,28 @@ function doMove(a, b){
   if (last.gold === 'got' || last.gold === 'lost') learn('gold');
   if (s0.gold && s0.gold.st === 0){                                                                        // золотая: счётчик толкается каждый ход, старое число уезжает
     V.goldTickT = t; V.goldPrev = s0.gold.left;
-    for (const arr of V.cont) for (const gl of arr) if (gl.gold) ring(gl.px, gl.py - CFG.GOLD_BADGE_DY, last.gold === 'lost' ? '#ff7a5c' : PAL.gold, 9, 30, 460, 2.5);
+    for (const arr of V.cont) for (const gl of arr) if (gl.gold) ring(gl.px, gl.py - CFG.GOLD_BADGE_DY, last.gold === 'lost' ? '#ff7a5c' : PAL.gold, 12, 38, 460, 2.5);
     if (last.gold === 'lost') goldLostFx(); else if (last.gold !== 'got') Sound.tick(G.s.gold.left);
   }
   relight(a, t);
   const landAll = (n - 1) * CFG.FLY_STAGGER_MS + flyMs;
   after(landAll, () => log('fx.end', 'fly'));
   if (last.completed){
-    G.lockUntil = t + dur(landAll + 60 + s0.per * CFG.WAVE_STEP_MS + Math.max(CFG.DONE_HOLD_MS + (isA ? 120 : CFG.CAP_MS), last.birdTo >= 0 ? CFG.RAY_MS + CFG.BIRD_NOTICE_MS + CFG.BIRD_FLY_MS * 0.6 : 0));
+    // Ввод не запирается: ядро провод уже освободило, и картинка тоже — гирлянда доигрывает сбор отдельным списком (V.gone),
+    // следующий ход можно начинать, пока она светится и улетает. Запирает ввод только победа.
+    const seq = { ci: b, arr: dst, go: null, left: false, rush: false };
+    if (RULES[G.s.v].leave){ V.cont[b] = []; for (const l of dst) l.grp = dst; V.gone.push(seq); }
+    V.pending++;
+    if (last.birdTo >= 0) V.birdDue = t + dur(landAll + 60 + dst.length * CFG.WAVE_STEP_MS + CFG.RAY_MS + CFG.BIRD_NOTICE_MS + CFG.BIRD_FLY_MS + 250);
     if (isWin(G.s)) G.lockUntil = Infinity;
-    after(landAll + 60, () => completeSeq(b, last));
+    after(landAll + 60, () => completeSeq(b, last, seq));
   } else after(landAll + 80, checkStuck);
   hud();
   return true;
 }
 function onLand(l){
-  const t = now(), arr = V.cont[l.ci]; if (!arr || arr[l.si] !== l) return;
-  l.landed = true; l.landT = t;
+  const t = now(), arr = l.grp || V.cont[l.ci]; if (!arr || arr[l.si] !== l) return;
+  l.landed = true; l.landT = t; kick(l.ci, 2.6);         // провод проседает под лампой и пружинит
   const nb = l.si > 0 ? arr[l.si - 1] : null, p = slotPos(l.ci, l.si);
   let run = 1; for (let q = l.si - 1; q >= 0 && arr[q].col === l.col && !arr[q].hid; q--) run++;
   Sound.land(Math.min(l.si, 5)); buzz(10);
@@ -1175,57 +1242,67 @@ function onLand(l){
     Sound.pearl(); buzz([8, 20, 8]);
     log('fx.start', 'pearl'); after(CFG.KISS_MS, () => log('fx.end', 'pearl'));
   }
-  relight(l.ci, t);
+  relightArr(arr, t);
 }
-// Цвет собран: волна по лампам с колокольчиками, аккорд, затем гирлянда улетает наверх (a) или колба закрывается (b).
-function completeSeq(ci, last){
-  const col = last.col, arr = V.cont[ci].slice(), per = arr.length, hex = colorHex(col), isA = G.s.v === 'a', c = contCenter(ci);
+// Цвет собран — самый сочный момент хода: «ток» бежит по проводу, волна по лампам с колокольчиками (каждая подпрыгивает),
+// аккорд (с каждой гирляндой уровня выше), свет гирлянды заливает сцену, кадр вздрагивает, провод пружинит;
+// затем гирлянда улетает наверх (a) или колба закрывается (b), а итоговая гирлянда отвечает волной.
+// Ввод всё это время открыт; тронули этот провод — гирлянда улетает сразу (seq.go).
+function completeSeq(ci, last, seq){
+  const col = last.col, arr = seq.arr, per = arr.length, hex = colorHex(col), isA = G.s.v === 'a', c = contCenter(ci), nth = Math.max(0, G.s.done.indexOf(col));
   log('fx.start', 'complete', 'c=' + ci + ' color=' + COLOR_NAMES[col]);
-  V.goldT[ci] = now();
+  V.goldT[ci] = V.curT[ci] = now();
   arr.forEach((l, j) => after(j * CFG.WAVE_STEP_MS, () => {
-    const t = now(); l.flashT = t; l.flashK = 1; twTo(l.lit, 1, t, 120); l.landT = t; l.landDir = j % 2 ? 1 : -1;
+    const t = now(); l.flashT = t; l.flashK = 1; twTo(l.lit, 1, t, 120); l.landT = t; l.landDir = j % 2 ? 1 : -1; l.popT = t; l.popK = 0.24;
     if (l.hid) revealFx(l, true);                          // тёмная в собранной гирлянде открывается вместе со всеми
-    Sound.waveNote(j); burst(l.px, l.py + bulbH() * 0.5, [hex, '#ffffff'], 6, 150, { life: 420, size: 7, g: 200 });
+    Sound.waveNote(j + nth); burst(l.px, l.py + bulbH() * 0.5, [hex, '#ffffff'], 6, 150, { life: 420, size: 7, g: 200 });
   }));
   after(per * CFG.WAVE_STEP_MS, () => {
-    Sound.complete(); buzz([20, 40, 30]);
+    const t = now();
+    Sound.complete(nth); buzz([20, 40, 30]);
     ring(c.x, c.y, hex, 20, 150, 620, 4); ring(c.x, c.y, '#ffffff', 10, 90, 460, 2);
     burst(c.x, c.y, [hex, hex, PAL.warm, '#ffffff'], 30, 260, { life: 800, size: 10, g: 260 });
-    arr.forEach(l => { l.flashT = now(); l.flashK = 1; });
+    G.flash = { t0: t, d: dur(680), col: hex, x: c.x, y: c.y, a: 0.38 }; G.shake = { t0: t, amp: 2.6 };
+    if (!seq.left){ arr.forEach(l => { l.flashT = t; l.flashK = 1; l.popT = t; l.popK = 0.3; }); kick(ci, 4.5); }
     if (last.thaw) thawFx(c.x, c.y);                       // первая гирлянда — волна тепла, иней трескается и тает
-    if (last.birdTo >= 0 && V.bird){                       // искра от гирлянды долетает до птицы: та подпрыгивает, показывает путь и летит по нему
+    if (last.birdTo >= 0 && V.bird && V.bird.at !== G.s.bird){   // искра от гирлянды долетает до птицы: та подпрыгивает, показывает путь и летит по нему
       const bp = wireEnd(V.bird.at); ray(c.x, c.y, bp.x, bp.y - 14, CFG.RAY_MS, PAL.warm);
-      after(CFG.RAY_MS, () => { V.birdHopT = V.birdArcT = now(); Sound.chirp(); });
-      after(CFG.RAY_MS + CFG.BIRD_NOTICE_MS, () => birdFly(last.birdTo));
+      after(CFG.RAY_MS, () => { if (V.bird && V.bird.at !== G.s.bird){ V.birdHopT = V.birdArcT = now(); Sound.chirp(); } });
+      after(CFG.RAY_MS + CFG.BIRD_NOTICE_MS, () => birdFly(G.s.bird));
     }
-    if (last.gold === 'got') goldFx(c.x, c.y);             // золотая собрана вовремя — бонус
+    if (last.gold === 'got') goldFx(c.x, c.y);             // золотая собрана вовремя — награда на месте
   });
-  after(per * CFG.WAVE_STEP_MS + CFG.DONE_HOLD_MS, () => {
+  const leave = seq.go = () => {
+    if (seq.left) return; seq.left = true;
     if (isA){                                            // гирлянда улетает на итоговый провод сверху
-      const base = V.top.length; V.cont[ci] = []; Sound.leave(); log('fx.start', 'leave');
+      const base = V.top.length; V.gone = V.gone.filter(x => x !== seq); Sound.leave(); log('fx.start', 'leave'); kick(ci, -5);
       arr.forEach((l, j) => {
-        const p0 = lampPose(l, now()); l.top = base + j; l.ci = -1; V.top.push(l);
+        const p0 = lampPose(l, now()); l.top = base + j; l.ci = -1; l.grp = null; V.top.push(l);
         startFly(l, p0, j * CFG.LEAVE_STAGGER_MS, topPos(l.top), CFG.LEAVE_MS);
         after(j * CFG.LEAVE_STAGGER_MS, () => twTo(l.sc, CFG.TOP_SCALE, now(), CFG.LEAVE_MS));
-        after(j * CFG.LEAVE_STAGGER_MS + CFG.LEAVE_MS, () => { l.landed = true; l.landT = now(); l.flashT = now(); l.flashK = 0.8; Sound.ting(j); });
+        after(j * CFG.LEAVE_STAGGER_MS + CFG.LEAVE_MS, () => { const t = now(); l.landed = true; l.landT = t; l.flashT = t; l.flashK = 0.8; l.popT = t; l.popK = 0.4; Sound.ting(j + nth); });
       });
-      after((per - 1) * CFG.LEAVE_STAGGER_MS + CFG.LEAVE_MS, () => { log('fx.end', 'leave'); log('fx.end', 'complete'); afterComplete(); });
+      after((per - 1) * CFG.LEAVE_STAGGER_MS + CFG.LEAVE_MS, () => { log('fx.end', 'leave'); log('fx.end', 'complete'); topWave(); afterComplete(); });
     } else {                                             // колба закрывается крышкой и остаётся светить
       V.capT[ci] = now(); log('fx.start', 'cap');
       after(CFG.CAP_MS * 0.7, () => { Sound.cap(); buzz(18); const g = GEO.cont[ci]; if (g) burst(g.x, g.yBot - g.h, [hex, '#ffffff'], 10, 140, { life: 420, size: 6, up: true, spread: 2.6 }); });
       after(CFG.CAP_MS, () => { log('fx.end', 'cap'); log('fx.end', 'complete'); afterComplete(); });
     }
-  });
+  };
+  after(per * CFG.WAVE_STEP_MS + (seq.rush ? 80 : CFG.DONE_HOLD_MS), leave);
 }
-function afterComplete(){ if (isWin(G.s)) winSeq(); else checkStuck(); }
+// topWave: итоговая гирлянда отвечает на пополнение — «ток» пробегает по всем собранным лампам
+function topWave(){ V.top.forEach((l, q) => after(q * 20, () => { const t = now(); l.flashT = t; l.flashK = 0.5; l.popT = t; l.popK = 0.16; })); }
+// Победа начинается не отсюда, а по состоянию в кадре (render): ядро выиграло, все сборы доиграны, финала ещё нет.
+function afterComplete(){ V.pending = Math.max(0, V.pending - 1); if (!isWin(G.s)) checkStuck(); }
 function winSeq(){
   const t = now(), s = G.s, isA = s.v === 'a';
   log('event', 'level.win', 'v=' + s.v + ' level=' + (s.li + 1) + ' moves=' + s.moves + ' par=' + levelsOf(s.v)[s.li].par);
   log('fx.start', 'win'); Sound.win(); buzz([30, 50, 30, 50, 60]);
-  G.winT = t;
+  G.winT = t; G.shake = { t0: t, amp: 3.5 }; G.flash = { t0: t, d: dur(900), col: PAL.warm, x: W / 2, y: isA ? CFG.TOP_Y + 30 : H * 0.4, a: 0.42 };
   const lamps = isA ? V.top.slice() : [].concat(...V.cont).sort((p, q) => (p.px - q.px) || (q.py - p.py));
   const span = CFG.WIN_WAVE_MS * 0.42;
-  lamps.forEach((l, q) => { for (let rep = 0; rep < 2; rep++) after(q * span / Math.max(1, lamps.length) + rep * span, () => { l.flashT = now(); l.flashK = 1; l.landT = now(); }); });
+  lamps.forEach((l, q) => { for (let rep = 0; rep < 2; rep++) after(q * span / Math.max(1, lamps.length) + rep * span, () => { l.flashT = now(); l.flashK = 1; l.landT = now(); l.popT = now(); l.popK = 0.3; }); });
   const cols = s.done.map(colorHex);
   for (let k = 0; k < 5; k++) after(k * 130, () => burst(W * (0.15 + 0.175 * k), isA ? CFG.TOP_Y + 20 : H * 0.3, cols.concat(['#ffffff']), 22, 300, { life: 1100, size: 10, g: 240 }));
   G.ending = t + dur(CFG.WIN_WAVE_MS);
@@ -1256,25 +1333,34 @@ function thawFx(x, y){
   log('fx.start', 'thaw'); Sound.thaw(); buzz([10, 30, 10, 30, 20]);
   ring(x, y, PAL.warm, 20, 470, 950, 7); ring(x, y, '#ffb86b', 10, 380, 780, 4);
   let maxD = 0;
-  const crackAt = (px, py, n) => burst(px, py, ['#ffffff', PAL.ice, '#9fd8ff'], n, 150, { life: 640, size: 6, g: 540 });
   const reach = (px, py) => { const d = Math.max(CFG.RAY_MS, 120 + Math.hypot(px - x, py - y) * CFG.THAW_WAVE_MS_PX); maxD = Math.max(maxD, d); ray(x, y, px, py, d, PAL.warm); return d; };
   for (const arr of V.cont) for (const l of arr){
     if (!l.ice) continue;
-    const ly = l.py + bulbH() * 0.4;
-    after(reach(l.px, ly), () => { l.ice = false; l.iceT = now(); l.landT = now(); l.landDir = l.id % 2 ? 1 : -1; l.flashT = now(); l.flashK = 0.8;
-      crackAt(l.px, ly, 12); ring(l.px, ly, PAL.warm, 6, 44, 420, 3); Sound.crack(); });
+    after(reach(l.px, l.py + bulbH() * 0.4), () => meltLamp(l));
   }
   if (V.iceWire >= 0){
     const i = V.iceWire, c = contCenter(i);
-    after(reach(c.x, c.y), () => { V.iceWire = -1; V.iceWireT[i] = now(); const g = GEO.cont[i]; if (g) for (let k = 0; k <= g.cap; k++) crackAt(g.x0 + g.dir * (CFG.A_WALL + k * g.step), g.y + 6, 5); });
+    after(reach(c.x, c.y), () => meltWire(i));
   }
   after(maxD + CFG.THAW_MS, () => log('fx.end', 'thaw'));
+}
+const crackAt = (px, py, n) => burst(px, py, ['#ffffff', PAL.ice, '#9fd8ff'], n, 150, { life: 640, size: 6, g: 540 });
+// meltLamp / meltWire: лёд трескается и осыпается — по искре тепла или сразу, если игрок тронул лампу раньше (settle)
+function meltLamp(l){
+  if (!l.ice) return;
+  const t = now(), ly = l.py + bulbH() * 0.4;
+  l.ice = false; l.iceT = t; l.landT = t; l.landDir = l.id % 2 ? 1 : -1; l.flashT = t; l.flashK = 0.8;
+  crackAt(l.px, ly, 12); ring(l.px, ly, PAL.warm, 6, 44, 420, 3); Sound.crack();
+}
+function meltWire(i){
+  if (V.iceWire !== i) return;
+  V.iceWire = -1; V.iceWireT[i] = now(); const g = GEO.cont[i]; if (g) for (let k = 0; k <= g.cap; k++) crackAt(g.x0 + g.dir * (CFG.A_WALL + k * g.step), g.y + 6, 5);
 }
 // ray: искра тепла летит из (x0, y0) в (x1, y1) за ms — видимая причина: гирлянда → иней, гирлянда → птица
 function ray(x0, y0, x1, y1, ms, col){ G.rays.push({ x0, y0, x1, y1, t0: now(), d: dur(ms), col }); }
 // birdFly: птица перелетает на провод to (ядро её уже пересадило)
 function birdFly(to){
-  if (!V.bird) return;
+  if (!V.bird || to < 0 || V.bird.at === to) return;          // уже там (игрок тронул провод, и она улетела раньше — settle)
   V.bird = { at: to, from: V.bird.at, t0: now(), d: dur(CFG.BIRD_FLY_MS) };
   Sound.flap(); log('fx.start', 'bird', 'to=' + to);
   after(CFG.BIRD_FLY_MS, () => { Sound.chirp(); buzz(10); const p = wireEnd(to); burst(p.x, p.y - 4, ['#ffd9a8', '#ffffff'], 6, 70, { life: 360, size: 5, g: 160 }); log('fx.end', 'bird'); });
@@ -1285,6 +1371,7 @@ function goldFx(x, y){
   ring(x, y, PAL.gold, 14, 210, 760, 5); ring(x, y, '#ffffff', 8, 130, 520, 2.5);
   burst(x, y, [PAL.gold, '#fff2a8', '#ff9a3c', '#ffffff'], 46, 330, { life: 1000, size: 11, g: 300 });
   burst(x, y, [PAL.gold], 9, 250, { life: 1200, size: 16, g: 240, up: true, spread: 2.4, spr: 'spark-gold' });
+  G.floats.push({ x, y: y - 14, t0: now() + dur(120), d: dur(1700), text: '+1' });     // награда на месте: искра «+1» всплывает над гирляндой
   after(1000, () => log('fx.end', 'gold'));
 }
 // goldLostFx: счётчик кончился — золотой патрон гаснет, лампа остаётся обычной
@@ -1307,6 +1394,14 @@ function lessonStart(){
   const keys = s.v === 'a' ? Object.keys(L.mech || {}).filter(k => MECH[k] && !learned(k)).sort((a, b) => MECH[a].order - MECH[b].order) : [];
   G.lesson = keys.length ? { keys, bump: '' } : null; G.handCache = null;
   keys.forEach((k, q) => after(CFG.SPOT_DELAY_MS + q * CFG.SPOT_MS, () => spot(k)));
+  if (GEO.ghost >= 0 && !G.save.seen.spare) after(CFG.SPOT_DELAY_MS + keys.length * CFG.SPOT_MS + 250, spareSpot);
+}
+// spareSpot: запасной провод появляется впервые (4-й уровень) — один раз блик по пунктиру и толчок кнопки, без текста
+function spareSpot(){
+  if (!G.s || G.screen !== 'game' || GEO.ghost < 0 || G.save.seen.spare) return;
+  G.save.seen.spare = 2; save(); V.spareT = now(); Sound.glint(); log('fx.start', 'spot.spare');
+  const b = $('btn-spare'); b.classList.remove('pulse'); void b.offsetWidth; b.classList.add('pulse');
+  after(1700, () => { b.classList.remove('pulse'); log('fx.end', 'spot.spare'); });
 }
 // spot: блик новой механики — её элемент один раз вспыхивает и звучит. Ввод не блокируется, касание ничего не отменяет.
 //   иней и обледеневший провод — блик по льду; тёмная — стекло мерцает цветами уровня; перламутровая — перелив;
@@ -1367,13 +1462,19 @@ function autoHand(t){
   else G.idleT = t;
 }
 function checkStuck(){
-  if (!G.s || G.screen !== 'game' || isWin(G.s) || !isStuck(G.s)) return;
+  if (!G.s || G.screen !== 'game' || isWin(G.s) || V.pending > 0 || !isStuck(G.s)) return;
   log('event', 'stuck', 'moves=' + G.s.moves);
   after(450, () => { if (G.s && G.screen === 'game' && isStuck(G.s)){ Sound.stuck(); goto('stuck'); } });
 }
 function undo(){
   if (!G.s || G.ending || now() < G.lockUntil || !G.s.hist.length) return;
+  const L = G.s.last;
   G.s = undoMove(G.s); syncVisual(); Sound.undo(); log('input', 'undo', 'moves=' + G.s.moves); hud();
+  if (L && V.cont[L.a]){                                 // вернувшиеся лампы качнулись и мигнули: видно, что именно отменилось
+    const arr = V.cont[L.a], t = now();
+    for (let k = 0; k < L.n && k < arr.length; k++){ const l = arr[arr.length - 1 - k]; l.landT = t; l.landDir = k % 2 ? 1 : -1; l.flashT = t; l.flashK = 0.4; }
+    kick(L.a, 3);
+  }
 }
 function useSpare(){
   if (!G.s || G.ending || now() < G.lockUntil) return;
@@ -1383,11 +1484,12 @@ function useSpare(){
   const i = V.cont.length - 1, c = contCenter(i);
   V.bornT[i] = now(); Sound.spare(); buzz(15);
   ring(c.x, c.y, PAL.warm, 10, 80, 500, 3);
-  log('event', 'spare', 'containers=' + V.cont.length); G.idleT = now(); G.hint = null; hud();
+  log('event', 'spare', 'containers=' + V.cont.length); G.idleT = G.inputT = now(); G.hint = null; hud();
 }
 function showHint(auto){
   if (!canInput()) return;
   const h = hintMove(G.s);
+  if (!auto) G.inputT = now();
   if (!auto) log('input', 'hint', h.move ? h.move.a + '>' + h.move.b : h.dead ? 'dead' : 'none');
   if (h.move){ G.hint = { a: h.move.a, b: h.move.b, t0: now(), until: auto ? 0 : now() + dur(CFG.HINT_SHOW_MS), auto: !!auto }; log('fx.start', 'hint'); }
   else if (!auto) toast(h.dead ? 'Отсюда не собрать — отмени ход' : 'Подсказки нет');
@@ -1419,7 +1521,7 @@ function onUp(e){
     const lamps = selLamps(), t = now();
     G.drag = null;
     if (to >= 0 && to !== from && canMove(G.s, from, to)){ doMove(from, to); return; }
-    if (to >= 0 && to !== from) bad(to, whyNot(G.s, posOf(G.s), from, to));
+    if (to >= 0 && to !== from) bad(to, whyNot(G.s, posOf(G.s), from, to), from);
     for (const l of lamps){ const p0 = { x: l.px, y: l.py }; const id = startFly(l, p0, 0); l.fly.length = 1; l.fly[0].x1 = slotPos(l.ci, l.si).x; l.fly[0].y1 = slotPos(l.ci, l.si).y; l.fly[0].d = dur(200); l.fly[0].arc = 0;
       after(200, () => { if (l.flyId === id) l.landed = true; }); }
     G.sel = -1; G.selN = 0; log('input', 'drag.cancel');
@@ -1472,10 +1574,11 @@ function glowSprite(color){
 }
 function glow(c, color, x, y, s, a){ if (a <= 0.003) return; c.globalCompositeOperation = 'lighter'; c.globalAlpha = Math.min(1, a); c.drawImage(glowSprite(color), x - s / 2, y - s / 2, s, s); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over'; }
 // drawBackground: тёмный вертикальный градиент и едва заметный свет по центру — без деталей
-function drawBackground(c){
+// amb 0..1 — сила фонового света: пока сцену заливает вспышка собранной гирлянды, он выключен (см. render) — в кадре всегда одно большое свечение.
+function drawBackground(c, amb){
   const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, PAL.sky1); g.addColorStop(1, PAL.sky2);
   c.fillStyle = g; c.fillRect(0, 0, W, H);
-  glow(c, '#2a3470', W / 2, H * 0.42, W * 2.1, 0.22);
+  if (amb > 0.01) glow(c, '#2a3470', W / 2, H * 0.42, W * 2.1, 0.22 * amb);
 }
 // drawBulbGlow: свечение лампы; lit 0..1 — яркость, flash — вспышка «поцелуя»/волны
 // Тёмная лампа не светится вовсе; перламутровая переливается (PEARL); золотой патрон тепло подсвечен.
@@ -1509,11 +1612,29 @@ function frostSprite(name){
   }
   g.globalAlpha = 1; return (FROST[name] = cvs);
 }
+// darkSprite: тёмная лампа — спрайт перегоревшей лампы с затемнённым стеклом и знаком вопроса («цвет неизвестен»).
+// Исходный спрайт светло-серый и на тёмном фоне выглядел ярче негорящих цветных; знак — дубль смысла не цветом (§9).
+let DARK = null;
+function darkSprite(){
+  if (DARK) return DARK;
+  const src = spr('bulb-burnt'); if (!src) return null;
+  const k = 3, cvs = document.createElement('canvas'); cvs.width = src.width * k; cvs.height = src.height * k;
+  const g = cvs.getContext('2d'), w = cvs.width, hh = cvs.height;
+  g.drawImage(src, 0, 0, w, hh);
+  g.globalCompositeOperation = 'source-atop';
+  const gr = g.createLinearGradient(0, hh * 0.3, 0, hh); gr.addColorStop(0, 'rgba(14,16,44,0)'); gr.addColorStop(0.12, 'rgba(14,16,44,.78)'); gr.addColorStop(1, 'rgba(8,9,28,.86)');
+  g.fillStyle = gr; g.fillRect(0, hh * 0.3, w, hh * 0.7);
+  g.fillStyle = 'rgba(206,214,255,.95)'; g.font = '900 ' + Math.round(hh * 0.36) + 'px Nunito, system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText('?', w / 2, hh * 0.665);
+  let ready = true; try { ready = !document.fonts || document.fonts.check('900 20px Nunito'); } catch (e) {}
+  if (ready) DARK = cvs;                                   // пока шрифт не загружен — рисуем, но не запоминаем
+  return cvs;
+}
 // drawBulb: лампочка, висящая цоколем вверх в точке (x, y), повёрнута на ang вокруг подвеса; спрайты bulb-off/bulb-on с перекрёстным переходом
 // Поверх: тёмное стекло (q.dark), иней со снежной шапкой (q.frost), золотой патрон со счётчиком (q.goldA) — см. lampLook().
 function drawBulb(c, q, t){
   const l = q.l, r = GEO.r, name = COLOR_NAMES[l.col], off = spr('bulb-off-' + name), on = spr('bulb-on-' + name), h = r * CFG.BULB_H_K, top = -h * CFG.BULB_HOOK_K;
-  const onA = clamp01((q.lit - 0.12) / 0.4), burnt = q.dark > 0 ? spr('bulb-burnt') : null;
+  const onA = clamp01((q.lit - 0.12) / 0.4), burnt = q.dark > 0 ? darkSprite() : null;
   c.save(); c.translate(q.x, q.y); c.rotate(q.ang); c.scale(q.sc, q.sc);
   if (burnt && q.dark >= 1){ const w = h * burnt.width / burnt.height; c.drawImage(burnt, -w / 2, top, w, h); }
   else if (off && on){
@@ -1542,6 +1663,7 @@ function drawBulb(c, q, t){
       if (gs){ const gw = w * CFG.GOLD_SOCKET_W, gh = gw * gs.height / gs.width; c.globalAlpha = q.goldA; c.drawImage(gs, -gw / 2, top + h * 0.012, gw, gh); c.globalAlpha = 1; }
       const gd = G.s.gold;
       if (l.gold && gd && gd.st === 0 && l.top < 0) drawGoldBadge(c, 0, -CFG.GOLD_BADGE_DY, gd.left, t);
+      if (l.gold && l.top >= 0){ const sp = spr('spark-gold'), z = (15 + 4 * Math.sin(t / 260 + l.id)) / CFG.TOP_SCALE; if (sp){ c.globalAlpha = 0.75 + 0.25 * Math.sin(t / 260 + l.id); c.drawImage(sp, -z / 2, top - z * 0.75, z, z); c.globalAlpha = 1; } }   // трофей: на итоговой гирлянде золотая лампа искрится
     }
   } else {                                                // запасной вариант кодом, пока спрайт не загрузился
     c.fillStyle = colorHex(q.l.col); c.globalAlpha = 0.55 + 0.45 * onA; c.beginPath(); c.ellipse(0, h * 0.5, r * 0.8, h * 0.36, 0, 0, Math.PI * 2); c.fill(); c.globalAlpha = 1;
@@ -1555,11 +1677,11 @@ function drawBulb(c, q, t){
 function drawGoldBadge(c, x, y, left, t){
   const hot = left <= CFG.GOLD_WARN, tk = (t - V.goldTickT) / dur(CFG.GOLD_TICK_MS), tickK = tk >= 0 && tk < 1 ? 1 - tk : 0, flip = tickK > 0 && V.goldPrev > left;
   const sc = 1 + 0.5 * tickK * tickK + (hot ? 0.08 * Math.sin(t / 110) : 0), R = CFG.GOLD_BADGE_R * sc, col = hot ? '#ff7a5c' : PAL.gold;
-  const num = (n, dy, a) => { c.globalAlpha = a; c.fillStyle = col; c.font = '900 ' + (n > 9 ? 10.5 : 12.5) * sc + 'px Nunito, system-ui, sans-serif'; c.fillText(String(n), 0, 0.8 + dy); };
+  const num = (n, dy, a) => { c.globalAlpha = a; c.fillStyle = col; c.font = '900 ' + (n > 9 ? 13.5 : 16) * sc + 'px Nunito, system-ui, sans-serif'; c.fillText(String(n), 0, 1 + dy); };
   c.save(); c.translate(x, y); c.textAlign = 'center'; c.textBaseline = 'middle';
   c.fillStyle = '#1d1405'; c.beginPath(); c.arc(0, 0, R, 0, Math.PI * 2); c.fill();
-  c.strokeStyle = col; c.lineWidth = 2 + 1.5 * tickK; c.beginPath(); c.arc(0, 0, R, 0, Math.PI * 2); c.stroke();
-  if (flip){ const e = ease(tk); num(V.goldPrev, -20 * e, 1 - e); num(left, 7 * (1 - e), clamp01(tk * 2.5)); }
+  c.strokeStyle = col; c.lineWidth = 2.4 + 1.5 * tickK; c.beginPath(); c.arc(0, 0, R, 0, Math.PI * 2); c.stroke();
+  if (flip){ const e = ease(tk); num(V.goldPrev, -25 * e, 1 - e); num(left, 8 * (1 - e), clamp01(tk * 2.5)); }
   else num(left, 0, 1);
   c.restore();
 }
@@ -1576,7 +1698,7 @@ function birdPath(fr, to, k){ const mx = (fr.x + to.x) / 2, my = Math.min(fr.y, 
 function drawBird(c, t){
   const b = V.bird, s = G.s; if (!b || !GEO.cont[b.at] || s.v !== 'a') return;
   const n = s.tubes.length, to = wireEnd(b.at), flying = b.from >= 0 && t < b.t0 + b.d, sit = spr('bird-sit'), fly = spr('bird-fly');
-  const next = wireEnd((b.at + 1) % n);
+  const next = wireEnd(s.bird !== b.at ? s.bird : (b.at + 1) % n);     // куда полетит: на следующий провод; если ядро уже ушло дальше (две гирлянды подряд) — сразу туда
   let x = to.x, y = to.y, face = next.x > to.x + 2 ? 1 : next.x < to.x - 2 ? -1 : GEO.cont[b.at].dir, im = sit, rot = 0, sy = 1;
   const path = (fr, dst, k0, a) => {                       // пунктир от k0 до конца пути и кольцо на месте посадки
     c.save(); c.globalAlpha = 0.9 * a; c.strokeStyle = PAL.warm; c.lineWidth = 2.4; c.lineCap = 'round'; c.setLineDash([2, 7]); c.lineDashOffset = -t / 40;
@@ -1658,12 +1780,14 @@ function drawRays(c, t){
 // Обледеневший провод — в ледяной корке с сосульками; провод с цветным патроном — скоба, патроны и силуэты ламп в его цвете.
 function drawWire(c, g, t, ghost){
   const x1 = g.x0, x2 = g.x0 + g.dir * g.len, born = V.bornT[g.i] === undefined ? 1 : ease((t - V.bornT[g.i]) / dur(420));
-  const xe = x1 + (x2 - x1) * born, mx = (x1 + xe) / 2, my = g.y + 2 * CFG.A_SAG * born;
+  const xe = x1 + (x2 - x1) * born, mx = (x1 + xe) / 2, my = g.y + 2 * sagOf(g.i) * born;
   c.lineCap = 'round';
   if (ghost){
-    c.save(); c.globalAlpha = 0.34 + 0.1 * Math.sin(t / 500); c.setLineDash([5, 7]); c.strokeStyle = PAL.muted; c.lineWidth = 2;
+    const sp = (t - V.spareT) / dur(1600), spk = sp >= 0 && sp < 1 ? Math.sin(sp * Math.PI) : 0;      // первый показ запасного провода: блик
+    c.save(); c.globalAlpha = 0.34 + 0.1 * Math.sin(t / 500) + 0.55 * spk; c.setLineDash([5, 7]); c.strokeStyle = spk > 0.05 ? PAL.warm : PAL.muted; c.lineWidth = 2;
     c.beginPath(); c.moveTo(x1, g.y); c.quadraticCurveTo(mx, my, xe, g.y); c.stroke(); c.setLineDash([]);
     const px = g.x0 + g.dir * g.len * 0.5, py = g.y + 22;
+    if (spk > 0){ const gx = g.x0 + g.dir * g.len * sp; glow(c, PAL.warm, gx, g.y + 4, 60, 0.7 * spk); glow(c, PAL.warm, px, py, 70, 0.45 * spk); c.globalAlpha = 0.34 + 0.6 * spk; }
     c.lineWidth = 2; c.beginPath(); c.arc(px, py, 12, 0, Math.PI * 2); c.stroke();
     c.lineWidth = 2.6; c.beginPath(); c.moveTo(px - 6, py); c.lineTo(px + 6, py); c.moveTo(px, py - 6); c.lineTo(px, py + 6); c.stroke();
     c.restore(); return;
@@ -1675,6 +1799,8 @@ function drawWire(c, g, t, ghost){
   c.strokeStyle = PAL['wire-hi']; c.lineWidth = sel || over ? 1.8 : 1.1; c.globalAlpha = sel || over ? 1 : 0.8; c.beginPath(); c.moveTo(x1, g.y - 0.7); c.quadraticCurveTo(mx, my - 0.7, xe, g.y - 0.7); c.stroke(); c.globalAlpha = 1;
   const gold = V.goldT[g.i] === undefined ? 0 : Math.max(0, 1 - (t - V.goldT[g.i]) / dur(1100));
   if (gold > 0){ c.globalCompositeOperation = 'lighter'; c.globalAlpha = gold; c.strokeStyle = PAL['wire-gold']; c.lineWidth = 3 + 3 * gold; c.beginPath(); c.moveTo(x1, g.y); c.quadraticCurveTo(mx, my, xe, g.y); c.stroke(); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over'; }
+  const cur = V.curT[g.i] === undefined ? -1 : (t - V.curT[g.i]) / dur(g.cap * CFG.WAVE_STEP_MS + 80);    // «ток»: искра бежит по проводу от стены вместе с волной
+  if (cur >= 0 && cur < 1){ const d = g.len * cur, sx = g.x0 + g.dir * d, sy = wireY(g, d); glow(c, PAL['wire-gold'], sx, sy, 74, 0.75); glow(c, '#ffffff', sx, sy, 30, 0.95); }
   if (born < 1) return;
   const used = V.cont[g.i] ? V.cont[g.i].length : 0;
   if (sockCol >= 0){                                      // ЦВЕТНОЙ ПАТРОН: провод, патроны и бледные силуэты ламп — в его цвете
@@ -1763,10 +1889,42 @@ function drawParticles(c, t){
     c.fillStyle = '#ffffff'; c.globalAlpha = (1 - k) * 0.8; c.fillRect(x - 1, y - 1, 2, 2); }
   c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
 }
-// drawTouch: метка касания (кружок с кольцом) — рука-подсказка без спрайта
+// drawTouch: рука-подсказка, нарисованная кодом: светлая кисть с тёмной обводкой — читается и на тёмном фоне, и на жёлтой или белой лампе.
+// (x, y) — куда показывает кончик пальца; press 0..1 — нажатие: кисть чуть опускается, от кончика расходится кольцо.
 function drawTouch(c, x, y, a, press){
-  c.save(); c.globalAlpha = a; c.fillStyle = 'rgba(255,255,255,.9)'; c.beginPath(); c.arc(x, y, 9 - 2 * press, 0, Math.PI * 2); c.fill();
-  c.strokeStyle = 'rgba(255,255,255,.7)'; c.lineWidth = 2.5; c.beginPath(); c.arc(x, y, 15 + 7 * press, 0, Math.PI * 2); c.globalAlpha = a * (1 - press * 0.7); c.stroke(); c.restore();
+  c.save(); c.translate(x, y);
+  if (press > 0.02){ c.globalAlpha = a * (1 - press * 0.6); c.strokeStyle = '#ffffff'; c.lineWidth = 2.6; c.beginPath(); c.arc(0, 0, 8 + 10 * press, 0, Math.PI * 2); c.stroke(); }
+  c.globalAlpha = a; c.translate(1, 4 - 3 * press); c.rotate(-0.4); c.scale(1.12 - 0.08 * press, 1.12 - 0.08 * press);
+  const hand = () => { c.beginPath(); c.roundRect(-5.5, 0, 11, 27, 5.5); c.roundRect(-7.5, 15, 25, 23, 8.5); c.roundRect(-15.5, 19, 11.5, 15, 5.5); };   // указательный, ладонь, большой
+  c.lineJoin = 'round'; c.strokeStyle = '#17142e'; c.lineWidth = 5; hand(); c.stroke();
+  c.fillStyle = '#fff8ec'; hand(); c.fill();
+  c.strokeStyle = 'rgba(23,20,46,.3)'; c.lineWidth = 1.5; c.lineCap = 'round'; c.beginPath(); c.moveTo(6.5, 18); c.lineTo(6.5, 25); c.moveTo(12, 18); c.lineTo(12, 24); c.stroke();
+  c.restore();
+}
+// drawNo: мягкий отказ (см. noFx) — кольца своего цвета вокруг двух несовпавших ламп; нет места — кольцо у крайней лампы полного провода
+function drawNo(c, t){
+  const N = G.no; if (!N) return;
+  const k = (t - N.t0) / dur(CFG.NO_MS); if (k >= 1){ G.no = null; return; }
+  const a = Math.sin(Math.min(1, k * 1.15) * Math.PI) * (0.65 + 0.35 * Math.cos(k * Math.PI * 5)), bh = bulbH();
+  const one = (l, col) => { if (!l) return; c.strokeStyle = col; c.globalAlpha = Math.max(0, a); c.beginPath(); c.arc(l.px, l.py + bh * 0.52, GEO.r * (1.25 + 0.2 * k), 0, Math.PI * 2); c.stroke(); };
+  c.save(); c.lineWidth = 3;
+  if (N.why === 'full') one(N.lb, '#ffffff');
+  else { one(N.la, N.la && !N.la.hid ? colorHex(N.la.col) : '#ffffff'); one(N.lb, N.lb && !N.lb.hid ? colorHex(N.lb.col) : '#cfd6ff'); }
+  c.restore();
+}
+// drawFloats: награда на месте — искра и «+1» всплывают над собранной золотой гирляндой (без попапа)
+function drawFloats(c, t){
+  if (!G.floats.length) return;
+  G.floats = G.floats.filter(f => t < f.t0 + f.d);
+  for (const f of G.floats){
+    const k = (t - f.t0) / f.d; if (k < 0) continue;
+    const y = f.y - 58 * ease(k), a = Math.min(1, k * 8, (1 - k) * 3), sc = 1 + 0.6 * Math.max(0, 1 - k * 6), im = spr('spark-gold');
+    c.save(); c.translate(f.x, y); c.scale(sc, sc); c.globalAlpha = a;
+    if (im) c.drawImage(im, -30, -14, 28, 28);
+    c.font = '1000 22px Nunito, system-ui, sans-serif'; c.textAlign = 'left'; c.textBaseline = 'middle'; c.lineJoin = 'round';
+    c.lineWidth = 4.5; c.strokeStyle = '#3a2410'; c.strokeText(f.text, 1, 1); c.fillStyle = PAL.gold; c.fillText(f.text, 1, 1);
+    c.restore();
+  }
 }
 // drawHint: откуда и куда — кольца на контейнерах и бегущая метка касания
 function drawHint(c, t){
@@ -1779,19 +1937,30 @@ function drawHint(c, t){
   c.globalAlpha = 0.5 + 0.4 * pulse; c.beginPath(); c.arc(B.x, B.y, GEO.r * 1.5 + 2 * pulse, 0, Math.PI * 2); c.stroke();
   if (G.sel !== h.a){ c.globalAlpha = 0.35 + 0.3 * pulse; c.beginPath(); c.arc(A.x, A.y, GEO.r * 1.5 + 2 * pulse, 0, Math.PI * 2); c.stroke(); }
   c.restore();
-  if (G.sel === h.a){ drawTouch(c, B.x, B.y + 8, 0.9, pulse); return; }
-  if (ph < 0.28) drawTouch(c, A.x, A.y + 8, 0.9, Math.sin(ph / 0.28 * Math.PI));
-  else if (ph < 0.72){ const k = easeIO((ph - 0.28) / 0.44); drawTouch(c, A.x + (B.x - A.x) * k, A.y + (B.y - A.y) * k - 40 * Math.sin(k * Math.PI) + 8, 0.75, 0); }
-  else drawTouch(c, B.x, B.y + 8, 0.9, Math.sin((ph - 0.72) / 0.28 * Math.PI));
+  if (G.sel === h.a){ drawTouch(c, B.x, B.y + 6, 0.96, pulse); return; }
+  if (ph < 0.28) drawTouch(c, A.x, A.y + 6, 0.96, Math.sin(ph / 0.28 * Math.PI));
+  else if (ph < 0.72){ const k = easeIO((ph - 0.28) / 0.44); drawTouch(c, A.x + (B.x - A.x) * k, A.y + (B.y - A.y) * k - 40 * Math.sin(k * Math.PI) + 6, 0.85, 0); }
+  else drawTouch(c, B.x, B.y + 6, 0.96, Math.sin((ph - 0.72) / 0.28 * Math.PI));
 }
 function render(){
   const t = now();
   tick(t);
   ctx.setTransform(DPR * scale, 0, 0, DPR * scale, 0, 0);
-  drawBackground(ctx);
+  // Свет собранной гирлянды заливает сцену. Большое свечение — самое дорогое в кадре, поэтому вспышка не добавляется к фоновому свету,
+  // а подменяет его: первые 3/4 времени — только вспышка (гаснет квадратично), последнюю четверть — фоновый свет плавно возвращается.
+  let amb = 1, fl = 0;
+  if (G.flash){ const k = (t - G.flash.t0) / G.flash.d; if (k >= 1) G.flash = null; else if (k < 0.75){ fl = G.flash.a * (1 - k) * (1 - k); amb = 0; } else amb = (k - 0.75) / 0.25; }
+  drawBackground(ctx, amb);
+  if (fl > 0) glow(ctx, G.flash.col, G.flash.x, G.flash.y, W * 1.9, fl);
   if (toastUntil && t > toastUntil){ $('toast').classList.add('hide'); toastUntil = 0; }
   const s = G.s; if (!s) return;
   const isA = s.v === 'a';
+  // победа — по состоянию, а не по событию: ядро выиграло, все сборы доиграны, финала ещё не было
+  if (G.winT < 0 && !G.ending && V.pending === 0 && isWin(s)) winSeq();
+  // лампочка-подсказка в шапке мигает, если игрок давно ничего не делал (руки вне уроков нет)
+  const idle = G.screen === 'game' && canInput() && !G.hint && t - G.inputT > dur(CFG.NUDGE_IDLE_MS);
+  if (idle !== G.nudge){ G.nudge = idle; $('btn-hint').classList.toggle('nudge', idle); }
+  if (G.shake){ const k = (t - G.shake.t0) / dur(CFG.SHAKE_MS); if (k >= 1 || REDUCED) G.shake = null; else { const a = G.shake.amp * (1 - k) * (1 - k); ctx.translate(Math.sin(k * 33) * a, Math.cos(k * 25) * a * 0.7); } }
   if (!G.hint && !G.drag && canInput() && t - G.idleT > dur(G.sel >= 0 || (G.lesson && G.lesson.bump) ? CFG.HAND_SEL_MS : CFG.HINT_IDLE_MS)) autoHand(t);   // рука урока: первый уровень и первый шаг урока механики
   // 1. контейнеры
   if (isA){ drawTopWire(ctx); for (const g of GEO.cont) drawWire(ctx, g, t, g.i === GEO.ghost); }
@@ -1801,6 +1970,7 @@ function render(){
   const add = (l) => { const p = lampPose(l, t), lf = twVal(l.lift, t), look = lampLook(l, t); p.l = l; p.dark = look.dark; p.frost = look.frost; p.goldA = look.goldA;
     p.lit = Math.max(twVal(l.lit, t), lf * 0.9, l.fly && l.top < 0 ? 0.9 : 0) * (1 - look.dark); p.flash = Math.max(0, 1 - (t - l.flashT) / dur(380)) * l.flashK; p.front = !!l.fly || lf > 0.05; poses.push(p); };
   for (const arr of V.cont) for (const l of arr) add(l);
+  for (const q of V.gone) for (const l of q.arr) add(l);
   for (const l of V.top) add(l);
   for (const q of poses) drawBulbGlow(ctx, q, t);
   for (const q of poses) if (!q.front) drawBulb(ctx, q, t);
@@ -1808,7 +1978,7 @@ function render(){
   for (const q of poses) if (q.front) drawBulb(ctx, q, t);
   drawBird(ctx, t);
   // 3. эффекты и подсказки
-  drawRings(ctx, t); drawRays(ctx, t); drawParticles(ctx, t); drawSpot(ctx, t); drawLesson(ctx, t); drawHint(ctx, t);
+  drawRings(ctx, t); drawRays(ctx, t); drawParticles(ctx, t); drawNo(ctx, t); drawFloats(ctx, t); drawSpot(ctx, t); drawLesson(ctx, t); drawHint(ctx, t);
   if (G.ending && t >= G.ending) finishWin();
 }
 
@@ -1864,7 +2034,7 @@ window.GIRLYANDA_SORT = {
     if (G.sel >= s.tubes.length || (G.sel >= 0 && !s.tubes[G.sel].length)) out.push('выбран пустой или несуществующий провод ' + G.sel);
     if (G.sel < 0 && !G.drag) for (const arr of V.cont) for (const l of arr) if (l.lift.b > 0) out.push('лампа осталась приподнятой');
     if (G.hint && G.hint.auto && !canMove(s, G.hint.a, G.hint.b)) out.push('рука урока показывает невозможный ход ' + G.hint.a + '>' + G.hint.b);
-    if (V.bird && !flyingBird() && now() >= G.lockUntil && V.bird.at !== s.bird) out.push('птица нарисована на ' + V.bird.at + ', в ядре ' + s.bird);
+    if (V.bird && !flyingBird() && now() >= V.birdDue && V.pending === 0 && V.bird.at !== s.bird) out.push('птица нарисована на ' + V.bird.at + ', в ядре ' + s.bird);
     if (G.frameErrors) out.push('ошибок кадра ' + G.frameErrors + ': ' + G.lastError);
     return out;
   },                                    // какой ход показала бы рука урока сейчас
