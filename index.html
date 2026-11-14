@@ -28,16 +28,24 @@
   --wire:#2a5a40; --wire-hi:#6fae82; --wire-gold:#ffd772; --socket:#3b4258;
   --glass:#aebcff; --glass-fill:#141a33;
   --card1:#241d44; --card2:#131029;
-  --frame-w:440px;
+  --frame-w:440px;                           /* расчётная ширина кадра (CFG.FRAME_W) */
+  --fk:1;                                    /* масштаб кадра: fitFrame() растягивает его на высоком портретном окне шире расчётного */
 }
 @media (prefers-color-scheme: light){ :root{ --bg:#15172a; } }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:16px/1.3 Nunito, system-ui, sans-serif;font-weight:700;
   overflow:hidden;overscroll-behavior:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
-#frame{position:relative;width:min(100vw,var(--frame-w));height:100dvh;height:100svh;margin:0 auto;background:var(--frame);overflow:hidden}
-#game{position:absolute;inset:0;touch-action:none}
+/* Кадр: расчётная ширина до --frame-w. Если окно шире и портретное (телефон в режиме «версия для ПК» отдаёт ширину 980 px, планшет),
+   кадр остаётся расчётной ширины и целиком масштабируется на --fk — игра занимает окно, а не узкую колонку; на десктопе (альбом) --fk = 1.
+   --sat/--sab — безопасные зоны в единицах кадра (делятся на масштаб). */
+#frame{position:relative;width:min(100vw,var(--frame-w));height:100vh;height:calc(100dvh / var(--fk));height:calc(100svh / var(--fk));margin:0 auto;background:var(--frame);overflow:hidden;
+  transform-origin:50% 0;--sat:calc(env(safe-area-inset-top, 0px) / var(--fk));--sab:calc(env(safe-area-inset-bottom, 0px) / var(--fk))}
+#frame.zoom{transform:scale(var(--fk))}
+#frame.narrow header{gap:5px;padding-left:8px;padding-right:8px} #frame.narrow header .pill{padding:6px 10px;font-size:13.5px} #frame.narrow .ib{width:36px;height:36px} #frame.narrow .ib svg{width:20px;height:20px} #frame.narrow #hud-moves .lbl{display:none}
+#sa{position:absolute;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;padding-top:var(--sat);padding-bottom:var(--sab)}
+#game{position:absolute;inset:0;touch-action:none;-webkit-touch-callout:none}
 #game canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
-header{position:absolute;left:0;right:0;top:0;display:flex;align-items:center;gap:7px;padding:calc(8px + env(safe-area-inset-top)) 10px 0;pointer-events:none;z-index:3}
+header{position:absolute;left:0;right:0;top:0;display:flex;align-items:center;gap:7px;padding:calc(8px + var(--sat)) 10px 0;pointer-events:none;z-index:3}
 header .pill{background:rgba(16,18,40,.7);border:1.5px solid rgba(255,255,255,.14);border-radius:999px;padding:6px 13px;font-weight:900;font-size:15px;letter-spacing:.01em;white-space:nowrap}
 header .pill.dim{color:var(--muted);font-weight:800}
 header .sp{flex:1}
@@ -45,8 +53,7 @@ header .sp{flex:1}
 .ib svg{width:22px;height:22px;fill:none;stroke:var(--ink);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
 .ib.off .wave{display:none} .ib:not(.off) .mutex{display:none}
 .ib:active{transform:scale(.92)}
-@media (max-width: 410px){ header{gap:5px;padding-left:8px;padding-right:8px} header .pill{padding:6px 10px;font-size:13.5px} .ib{width:36px;height:36px} .ib svg{width:20px;height:20px} #hud-moves .lbl{display:none} }
-footer{position:absolute;left:0;right:0;bottom:0;display:flex;gap:10px;justify-content:center;padding:0 12px calc(12px + env(safe-area-inset-bottom));pointer-events:none;z-index:3}
+footer{position:absolute;left:0;right:0;bottom:0;display:flex;gap:10px;justify-content:center;padding:0 12px calc(12px + var(--sab));pointer-events:none;z-index:3}
 footer button{pointer-events:auto;background:rgba(22,24,52,.86);border:1.5px solid rgba(255,255,255,.16);border-radius:999px;padding:10px 18px;font-size:15px;display:flex;align-items:center;gap:7px}
 footer button svg{width:18px;height:18px;fill:none;stroke:var(--ink);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
 footer button[disabled]{opacity:.35}
@@ -98,6 +105,7 @@ footer button.pulse{animation:pulse .8s ease-in-out 2}
 /* замок — CSS-формой, не глифом (глиф вне шрифта = кадр 1 с) */
 .lock{width:12px;height:10px;border-radius:2px;background:var(--muted);position:relative;margin-top:7px}
 .lock:before{content:"";position:absolute;left:2px;top:-7px;width:8px;height:8px;border:2px solid var(--muted);border-bottom:0;border-radius:5px 5px 0 0;box-sizing:border-box}
+.ver{margin-top:8px;font-size:11px;color:var(--muted);opacity:.6;font-weight:800}
 .cheat{margin-top:8px;font-size:12px;padding:6px 10px;background:transparent;border:1.5px dashed var(--muted);color:var(--muted);border-radius:12px}
 .stars{display:flex;gap:8px;justify-content:center;margin:6px 0 12px}
 .star{width:52px;height:52px;background:#40376c;clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)}
@@ -107,7 +115,7 @@ footer button.pulse{animation:pulse .8s ease-in-out 2}
 .stars .star.on:nth-child(2){animation-name:starIn2}
 @keyframes starIn2{from{transform:translateY(-8px) scale(1.6) rotate(-20deg)}to{transform:translateY(-8px) scale(1)}}
 .how{text-align:left;color:var(--muted);margin:0 0 16px;padding-left:20px;font-weight:700} .how li{margin:6px 0} .how b{color:var(--ink)}
-#toast{position:absolute;left:50%;top:calc(60px + env(safe-area-inset-top));transform:translateX(-50%);background:rgba(255,248,230,.96);color:var(--ink-dark);padding:9px 16px;border-radius:14px;
+#toast{position:absolute;left:50%;top:calc(60px + var(--sat));transform:translateX(-50%);background:rgba(255,248,230,.96);color:var(--ink-dark);padding:9px 16px;border-radius:14px;
   pointer-events:none;opacity:.98;transition:opacity .25s;white-space:nowrap;z-index:4;font-weight:900;font-size:14px}
 #toast.hide{opacity:0}
 @media (prefers-reduced-motion: reduce){ .card,.star.on,.ib.nudge,footer button.pulse{animation:none} .ib.nudge{box-shadow:0 0 0 4px rgba(255,207,51,.3)} #toast{transition:none} }
@@ -115,6 +123,7 @@ footer button.pulse{animation:pulse .8s ease-in-out 2}
 </head>
 <body>
 <div id="frame">
+  <i id="sa"></i>
   <div id="game"><canvas id="cv"></canvas></div>
   <header>
     <span class="pill" id="hud-level">Уровень 1</span><span class="pill dim" id="hud-moves"><span class="lbl">ходы </span><span id="hud-moves-n">0</span></span><span class="sp"></span>
@@ -180,7 +189,22 @@ const CFG = {
   B_BULB_R: 13.5,         // «радиус» лампы в колбе
   B_ROW_GAP: 58,          // зазор между рядами колб (место под приподнятую лампу)
   HIT_PAD: 12,            // запас зоны попадания вокруг контейнера
-  DRAG_PX: 10,            // порог тап/драг, CSS px
+  FRAME_W: 440,           // расчётная ширина кадра, CSS px (то же число в --frame-w)
+  FRAME_MIN_H: 720,       // кадр, растянутый на широкое портретное окно, не становится ниже этой расчётной высоты (иначе берётся масштаб по высоте)
+  FRAME_NARROW: 410,      // кадр уже этого — компактная шапка
+  CANVAS_MAX_W: 1100,     // потолок ширины холста в пикселях устройства: окно 980 px × DPR 2 дало бы холст на 8 Мп
+  // --- ввод (всё в виртуальных юнитах: в окне «версии для ПК» CSS-пиксель втрое мельче пальца) ---
+  DRAG_PX: 10,            // порог тап/драг: сдвинул палец дальше — лампы пошли за пальцем
+  DRAG_ARM: 26,           // перетаскивание «взведено», когда палец ушёл от точки касания дальше этого; до того отпускание = тап (лампы остаются приподнятыми)
+  DRAG_GAP: 26,           // зазор между пальцем и низом несомой лампы (лампа видна над пальцем)
+  DRAG_GRAB_MS: 90,       // подхват: за столько лампы приходят с провода к пальцу, дальше идут за ним жёстко
+  DROP_SNAP_K: 0.8,       // радиус прилипания к подходящему проводу, в высотах ряда: лампа ближе — провод подсвечен, отпустил — сели
+  DROP_BIAS_K: 0.2,       // фора подходящему проводу перед неподходящим соседом, в высотах ряда
+  DROP_FINGER_PEN: 12,    // провод под самим пальцем тоже считается, но со штрафом: при прочих равных решает лампа
+  DROP_STICK: 8,          // липкость уже подсвеченного провода (чтобы подсветка не мигала на границе)
+  DROP_GHOST_A: 0.4,      // прозрачность силуэтов «сюда сядут» на подсвеченном проводе
+  UNDO_FLY_MS: 230,       // отмена: лампы летят назад с того места, где их застала отмена
+  WIN_SKIP_MS: 320,       // тап после победного хода сокращает финальную волну до этого
   // --- свет ---
   LIT_SINGLE: 0.0,        // яркость одиночной лампы (0 — спрайт «не горит», цвет читается)
   LIT_PAIR: 0.62,         // яркость группы из двух одинаковых
@@ -191,6 +215,7 @@ const CFG = {
   FLY_MS: 300,            // перелёт лампы
   FLY_STAGGER_MS: 85,     // задержка между лампами группы
   FLY_ARC: 54,            // высота дуги перелёта
+  FLY_HURRY_MS: 110,      // лампу выбрали, пока она летит: остаток пути она проходит не дольше этого и садится уже приподнятой
   KISS_MS: 420,           // «поцелуй» совпавших ламп
   SWING_MS: 900,          // качание после посадки
   LIT_MS: 260,            // разгорание/затухание
@@ -625,6 +650,7 @@ function noviceRun(levelIndex, variant, seed){ return botRun(createState(levelIn
 // Ядро меняет состояние мгновенно, оболочка доигрывает ход по своей визуальной модели (V).
 // ---------------------------------------------------------------------------
 const NAME = 'girlyanda-sort';
+const VERSION = '0.5.0';                              // видна в меню: по ней плейтестер и мы понимаем, какая сборка открыта
 const T0 = performance.now();
 let clockSkew = 0;                                    // drive() двигает игровые часы вперёд без ожидания
 const now = () => performance.now() + clockSkew;
@@ -647,10 +673,12 @@ const G = {
   screen: 'menu',                // menu | game | help | win | stuck
   save: null,
   sel: -1, selN: 0,              // выбранный контейнер и сколько ламп приподнято
-  down: null, drag: null,        // палец: нажатие и перетаскивание
+  down: null,                    // палец на поле: { id, x, y, ci, moved, picked, wasSel }
+  drag: null,                    // перетаскивание: { x, y, t0, lt, vx, over, overT, no, armed } — over: провод, куда сядут лампы, если отпустить
+  lasts: [],                     // ходы оболочки в порядке истории ядра (last каждого хода, null — запасной провод): отмена знает, какие лампы вернуть
   events: [],                    // очередь [{ at, fn }] — дедлайны в now()
   parts: [], rings: [],          // частицы и кольца-волны
-  lockUntil: 0,                  // до какого времени поле не принимает ввод (сбор цвета)
+  lockUntil: 0,                  // до какого времени поле не принимает ввод: только победа (Infinity). Полёты и сбор гирлянды ввод не запирают
   ending: 0,                     // когда показать карточку победы, 0 = не ждём
   hint: null,                    // { a, b, t0, until, auto }
   idleT: 0,                      // время последнего ввода (для руки на 1-м уровне)
@@ -765,6 +793,7 @@ const Sound = {
   },
   note(step){ return 523.25 * Math.pow(2, PENTA[Math.max(0, Math.min(Math.round(step) || 0, PENTA.length - 1))] / 12); },
   ui(){ this.tone(640, 50, 'triangle', 0.06); log('sound', 'ui'); },
+  aim(){ this.tone(1180, 26, 'sine', 0.035); },          // перетаскивание: лампа навелась на провод
   pick(n){ const f = 392 * Math.pow(2, PENTA[Math.max(0, Math.min((n || 1) - 1, 4))] / 12); this.hiss(28, 'bandpass', 2600, 0.16, 0, 3); this.tone(f, 70, 'triangle', 0.07, 0, f * 1.35); log('sound', 'pick'); },   // чем больше ламп снялось — тем выше
   fly(n){ this.hiss(150 + 40 * Math.min(n, 4), 'bandpass', 1300, 0.045, 0, 0.7); this.tone(300, 150, 'sine', 0.022, 0, 640); log('sound', 'fly'); },   // взлёт группы: мягкий «фух»
   land(step){ this.hiss(20, 'bandpass', 2200, 0.3, 0, 4); this.tone(150, 80, 'sine', 0.16, 0, 80); this.bell(this.note(step), 0.01, 0.055); log('sound', 'land'); },
@@ -833,7 +862,7 @@ function goto(screen, payload){
       <div class="levels${LV.length > 10 ? ' many' : ''}">${lv}</div>${goldRow}
       <div class="row"><button data-act="help">Как играть</button></div>
       <div class="row">${G.save.unlockAll ? '<button class="cheat" data-act="relock">Чит включён · закрыть обратно</button>' : '<button class="cheat" data-act="unlock">Чит: открыть все уровни</button>'}
-      <button class="cheat" data-act="wipe">Сбросить прогресс</button></div>`;
+      <button class="cheat" data-act="wipe">Сбросить прогресс</button></div><div class="ver">v${VERSION}</div>`;
   }
   if (screen === 'help'){
     card.innerHTML = G.v === 'a'
@@ -899,6 +928,8 @@ function toast(msg){ const t = $('toast'); t.textContent = msg; t.classList.remo
 const cv = $('cv'), ctx = cv.getContext('2d');
 const VW = CFG.VW;
 let scale = 1, W = VW, H = 640, DPR = 1;
+const SAFE = { top: 0, bottom: 0 };                  // безопасные зоны экрана (чёлка, полоска жестов) в виртуальных юнитах — поле и итоговая гирлянда отступают на них
+const topY = () => CFG.TOP_Y + SAFE.top;             // высота подвеса итоговой гирлянды
 // Запасной контейнер на первых уровнях спрятан: на экране только то, что нужно для урока.
 const spareOpen = (s) => s.li >= CFG.SPARE_FROM_LEVEL - 1;
 // layout(): места контейнеров. Место под запасной контейнер зарезервировано заранее (призрак) — поле не прыгает.
@@ -909,7 +940,7 @@ function layout(){
   GEO.cont = []; GEO.ghost = ghost ? n : -1;
   if (s.v === 'a'){
     // провода растут от левой и правой стены в шахматном порядке, как ветки
-    const rows = Math.ceil(N / 2), top = CFG.A_TOP, bottom = H - CFG.A_BOTTOM;
+    const rows = Math.ceil(N / 2), top = CFG.A_TOP + SAFE.top, bottom = H - CFG.A_BOTTOM - SAFE.bottom;
     const rowH = Math.max(CFG.A_ROW_MIN, Math.min(CFG.A_ROW_MAX, (bottom - top) / (rows + 0.5)));
     const y0 = top + Math.max(0, (bottom - top - (rows + 0.5) * rowH) * 0.5);     // поле по центру свободной высоты: ближе к большому пальцу, чем к шапке
     GEO.r = CFG.BULB_R; GEO.rowH = rowH; GEO.k = 1;
@@ -919,7 +950,7 @@ function layout(){
     }
   } else {
     // колбы в один или два ряда, донышки по линии; всё поле сжимается коэффициентом k, если не влезает по высоте
-    const perRow = N <= 5 ? N : Math.ceil(N / 2), rows = N <= 5 ? 1 : 2, top = CFG.B_TOP, bottom = H - CFG.B_BOTTOM;
+    const perRow = N <= 5 ? N : Math.ceil(N / 2), rows = N <= 5 ? 1 : 2, top = CFG.B_TOP + SAFE.top, bottom = H - CFG.B_BOTTOM - SAFE.bottom;
     let maxCap = 0; for (let i = 0; i < N; i++) maxCap = Math.max(maxCap, capOf(i));
     const rowBlock = maxCap * CFG.B_SLOT + 16 + CFG.B_ROW_GAP;
     const k = Math.min(1, (bottom - top) / (rows * rowBlock));
@@ -948,7 +979,7 @@ function mouthPos(ci){ const c = GEO.cont[ci]; return { x: c.x, y: c.yBot - c.h 
 // topPos: место q на итоговой гирлянде сверху (вариант a)
 function topPos(q){
   const N = G.s.colors * G.s.per + G.s.wild, x = 16 + (q + 0.5) / N * (W - 32), u = x / W;
-  return { x, y: CFG.TOP_Y + 4 * CFG.TOP_SAG * u * (1 - u) };
+  return { x, y: topY() + 4 * CFG.TOP_SAG * u * (1 - u) };
 }
 // wireEnd: свободный конец провода — тут сидит птица (вариант a)
 function wireEnd(i){ const g = GEO.cont[i]; return g && g.dir ? { x: g.x0 + g.dir * (g.len - 7), y: g.y + 1 } : { x: W / 2, y: H / 2 }; }
@@ -982,7 +1013,7 @@ let lampSeq = 0;
 function mkLamp(v, ci, si){
   return { id: lampSeq++, col: v & COLOR, ice: !!(v & ICE), hid: !!(v & HID), gold: !!(v & GOLD), iceT: -1e9, revT: -1e9, goldT: -1e9,
     ci, si, top: -1, landed: true, fly: null, flyId: 0, lift: tw(0), lit: tw(0), sc: tw(1),
-    landT: -1e9, landDir: 1, kissT: -1e9, kissDir: 0, flashT: -1e9, flashK: 0, popT: -1e9, popK: 0, noT: -1e9, grp: null, px: 0, py: 0, dragX: null, dragY: null };   // popT/popK — толчок масштаба, noT — качает «нет», grp — гирлянда, в которой лампа доигрывает сбор
+    landT: -1e9, landDir: 1, kissT: -1e9, kissDir: 0, flashT: -1e9, flashK: 0, popT: -1e9, popK: 0, noT: -1e9, grp: null, px: 0, py: 0, dragX: null, dragY: null, dragFrom: null, landCb: null };   // landCb — что сделать, когда полёт закончится (см. lampPose)   // popT/popK — толчок масштаба, noT — качает «нет», grp — гирлянда, в которой лампа доигрывает сбор
 }
 // яркость лампы по длине её группы: одиночная не горит, пара загорается, собранный цвет — в полную силу
 function litLevel(L, per){ return L < 2 ? CFG.LIT_SINGLE : CFG.LIT_PAIR + (1 - CFG.LIT_PAIR) * (L - 2) / Math.max(1, per - 2); }
@@ -1017,29 +1048,37 @@ function selLamps(){ if (G.sel < 0 || !V.cont[G.sel]) return []; const arr = V.c
 function lampPose(l, t){
   const base = l.top >= 0 ? topPos(l.top) : slotPos(l.ci, l.si), isA = G.s.v === 'a';
   let x = base.x, y = base.y, ang = 0, sc = twVal(l.sc, t);
+  const lift = twVal(l.lift, t), liftY = lift > 0.001 && l.top < 0 ? (isA ? CFG.A_LIFT : base.y - mouthPos(l.ci).y) * lift : 0;
+  const dg = G.drag;
+  if (dg && l.ci === G.sel && l.top < 0 && !l.grp && l.si >= V.cont[l.ci].length - G.selN){     // перетаскивание: группа веером над пальцем
+    // Подхват за DRAG_GRAB_MS (от места, где лампу застало касание, — хоть в полёте), дальше лампа идёт за пальцем жёстко, в тот же кадр:
+    // «догоняние» читается как вязкость, а цель выбирается по лампе — она должна быть там, где её видит игрок.
+    const q = l.si - (V.cont[l.ci].length - G.selN), n = G.selN, k = ease((t - dg.t0) / dur(CFG.DRAG_GRAB_MS)), f = l.dragFrom || { x, y: y - liftY };
+    const tx = dg.x + (q - (n - 1) / 2) * GEO.r * 2.1, ty = dg.y - CFG.DRAG_GAP - bulbH() * (1 - CFG.BULB_HOOK_K);
+    x = f.x + (tx - f.x) * k; y = f.y + (ty - f.y) * k;
+    if (isA) ang = Math.max(-0.4, Math.min(0.4, dg.vx * 0.45)) * Math.exp(-(t - dg.lt) / 140);   // лампа отстаёт «хвостом» от движения пальца
+    l.dragX = l.px = x; l.dragY = l.py = y;
+    return { x, y, ang, sc: sc * (1 + 0.08 * k) };
+  }
+  if (l.dragX !== null) l.dragX = l.dragY = null;
   if (l.fly){
     let seg = null;
     for (const sg of l.fly) if (t < sg.t0 + sg.d){ seg = sg; break; }
-    if (!seg) l.fly = null;
+    if (!seg){ l.fly = null; const cb = l.landCb; if (cb){ l.landCb = null; cb(l); } }   // посадка — по состоянию полёта в кадре, а не по таймеру: полёт можно ускорить или перебить
     else {
-      const e = seg.ease((t - seg.t0) / seg.d);
-      x = seg.x0 + (seg.x1 - seg.x0) * e; y = seg.y0 + (seg.y1 - seg.y0) * e - seg.arc * 4 * e * (1 - e);
-      if (isA) ang = (seg.x1 - seg.x0) / 400 * Math.sin(e * Math.PI) * 0.9;     // в полёте лампа отстаёт «хвостом»
+      // Цель полёта живая: место лампы считается каждый кадр (провод пружинит, раскладка меняется, лампу выбрали в полёте — она садится уже приподнятой).
+      const e = seg.ease((t - seg.t0) / seg.d), m = seg.to === 2 || seg.from === 2 ? mouthPos(l.ci) : null;
+      const x0 = seg.from === 2 ? m.x : seg.x0, y0 = seg.from === 2 ? m.y : seg.y0, x1 = seg.to === 2 ? m.x : base.x, y1 = seg.to === 2 ? m.y : base.y - liftY;
+      x = x0 + (x1 - x0) * e; y = y0 + (y1 - y0) * e - seg.arc * 4 * e * (1 - e);
+      if (isA) ang = (x1 - x0) / 400 * Math.sin(e * Math.PI) * 0.9;     // в полёте лампа отстаёт «хвостом»
       l.px = x; l.py = y;
-      return { x, y, ang, sc: sc * (1 + 0.12 * Math.sin(e * Math.PI)) };
+      return { x, y, ang, sc: sc * (1 + 0.12 * Math.sin(e * Math.PI)) * (isA ? 1 + 0.1 * lift * e : 1) };
     }
   }
-  const lift = twVal(l.lift, t);
   if (lift > 0.001){
     if (isA){ y -= CFG.A_LIFT * lift - Math.sin(t / 260 + l.id) * 1.6 * lift; sc *= 1 + 0.1 * lift; }
     else if (l.top < 0){ y -= (base.y - mouthPos(l.ci).y) * lift - Math.sin(t / 260) * 1.6 * lift; }
   }
-  if (G.drag && l.ci === G.sel && l.top < 0 && !l.grp && l.si >= V.cont[l.ci].length - G.selN){     // перетаскивание: группа веером над пальцем
-    const q = l.si - (V.cont[l.ci].length - G.selN), n = G.selN;
-    const tx = G.drag.x + (q - (n - 1) / 2) * GEO.r * 2.1, ty = G.drag.y - bulbH() - 26;
-    l.dragX = l.dragX === null ? x : l.dragX + (tx - l.dragX) * 0.4; l.dragY = l.dragY === null ? y : l.dragY + (ty - l.dragY) * 0.4;
-    x = l.dragX; y = l.dragY; sc *= 1.08;
-  } else if (l.dragX !== null){ l.dragX = l.dragY = null; }
   const tau = (t - l.landT) / 1000 * G.timeScale;                          // качание после посадки
   if (tau >= 0 && tau < CFG.SWING_MS / 1000){
     if (isA) ang -= l.landDir * 0.4 * Math.exp(-4.2 * tau) * Math.sin(tau * 15);
@@ -1060,15 +1099,25 @@ function lampPose(l, t){
   l.px = x; l.py = y;
   return { x, y, ang, sc };
 }
-function startFly(l, p0, delayMs, dest, ms){
-  const t0 = now() + dur(delayMs || 0), to = dest || slotPos(l.ci, l.si), d = dur(ms || CFG.FLY_MS);
-  l.lift = tw(0); l.dragX = l.dragY = null; l.landed = false; l.flyId++;
-  if (G.s.v === 'b' && !dest){
-    const m = mouthPos(l.ci), d1 = d * 0.62, d2 = d * 0.38;     // дуга до горлышка, потом падение в колбу
-    l.fly = [{ x0: p0.x, y0: p0.y, x1: m.x, y1: m.y, t0, d: d1, arc: CFG.FLY_ARC * 0.55, ease: easeIO }, { x0: m.x, y0: m.y, x1: to.x, y1: to.y, t0: t0 + d1, d: d2, arc: 0, ease: easeIn }];
-  } else l.fly = [{ x0: p0.x, y0: p0.y, x1: to.x, y1: to.y, t0, d, arc: dest ? 30 : CFG.FLY_ARC, ease: easeIO }];
+// startFly: лампа летит из p0 на своё место (l.ci/l.si или l.top). kind: '' — перелёт на провод (в колбу — через горлышко),
+// 'top' — на итоговую гирлянду, 'back' — прямо назад (сорванное перетаскивание, отмена). Место назначения не запоминается — см. lampPose.
+function startFly(l, p0, delayMs, kind, ms){
+  const t0 = now() + dur(delayMs || 0), to = l.top >= 0 ? topPos(l.top) : slotPos(l.ci, l.si), d = dur(ms || CFG.FLY_MS);
+  l.lift = tw(0); l.dragX = l.dragY = null; l.dragFrom = null; l.landed = false; l.flyId++; l.landCb = null;
+  if (G.s.v === 'b' && !kind){
+    const d1 = d * 0.62, d2 = d * 0.38;                          // дуга до горлышка, потом падение в колбу
+    l.fly = [{ x0: p0.x, y0: p0.y, t0, d: d1, arc: CFG.FLY_ARC * 0.55, ease: easeIO, to: 2 }, { from: 2, t0: t0 + d1, d: d2, arc: 0, ease: easeIn, to: 1 }];
+  } else l.fly = [{ x0: p0.x, y0: p0.y, t0, d, arc: kind === 'top' ? 30 : kind === 'back' ? 0 : CFG.FLY_ARC, ease: easeIO, to: 1 }];
   l.landDir = to.x >= p0.x ? 1 : -1;
   return l.flyId;
+}
+// hurry: лампу тронули в полёте (выбрали её провод) — она не доигрывает дугу, а за FLY_HURRY_MS приходит на место, уже приподнятая.
+// Иначе выбор «не отвечает», пока лампа не сядет: это и читалось как задержка от анимации.
+function hurry(l){
+  if (!l.fly) return;
+  const t = now(), last = l.fly[l.fly.length - 1], left = last.t0 + last.d - t, p = lampPose(l, t);
+  if (!l.fly) return;
+  l.fly = [{ x0: p.x, y0: p.y, t0: t, d: Math.max(1, Math.min(left, dur(CFG.FLY_HURRY_MS))), arc: 0, ease: ease, to: 1 }];
 }
 
 // --- частицы и кольца: положение считается от t0 аналитически (абсолютное время, §4) ---
@@ -1085,7 +1134,7 @@ function ring(x, y, col, r0, r1, ms, lw){ G.rings.push({ x, y, col, r0, r1, t0: 
 function startLevel(li, v){
   if (v) setVariant(v);
   li = Math.max(0, Math.min(levelsOf(G.v).length - 1, li | 0));
-  G.s = createState(li, G.v); G.parts = []; G.rings = []; G.floats = []; G.flash = null; G.shake = null; G.ending = 0; G.winT = -1e9;
+  G.s = createState(li, G.v); G.lasts = []; G.parts = []; G.rings = []; G.floats = []; G.flash = null; G.shake = null; G.ending = 0; G.winT = -1e9;
   syncVisual();
   const L = levelsOf(G.v)[li];
   log('event', 'level.start', 'v=' + G.v + ' level=' + (li + 1) + ' par=' + L.par + (L.mech ? ' mech=' + Object.keys(L.mech).filter(k => MECH[k]).join('+') : ''));
@@ -1114,7 +1163,7 @@ function select(ci, quiet){
   if (ci >= 0){
     settle(ci);
     G.selN = RULES[G.s.v].group ? topRun(G.s.tubes[ci]) : 1;
-    for (const l of selLamps()) twTo(l.lift, 1, t, 150);
+    for (const l of selLamps()){ twTo(l.lift, 1, t, 150); hurry(l); }
     kick(ci, -2.2);                                        // провод облегчённо подпрыгивает
     if (!quiet) Sound.pick(G.selN);
     buzz(8); log('input', 'select', 'c=' + ci + ' n=' + G.selN);
@@ -1149,7 +1198,7 @@ function noFx(a, b, why){
 // чтобы картинка не спорила с правилом. Гирлянда, которая ещё висит на проводе, улетает немедленно.
 function settle(ci){
   const s = G.s; if (!s || ci < 0 || !V.cont[ci]) return;
-  for (const q of V.gone) if (q.ci === ci){ if (q.go) q.go(); else q.rush = true; }
+  for (const q of V.gone.slice()) if (q.ci === ci) q.go();   // гирлянда улетает сразу — даже если её лампы ещё не долетели до провода
   if (s.ice < 0 && V.iceWire === ci) meltWire(ci);
   const str = s.tubes[ci] || '';
   V.cont[ci].forEach((l, j) => { if (l.ice && s.ice !== ci && j < str.length && !(lampAt(str, j) & ICE)) meltLamp(l); });
@@ -1177,14 +1226,14 @@ function doMove(a, b){
   settle(a); settle(b);
   G.s = applyMove(s0, { a, b });
   const last = G.s.last, src = V.cont[a], dst = V.cont[b];
+  G.lasts.push(last);
   log('input', 'move', a + '>' + b + ' n=' + n + (last.completed ? ' completed' : ''));
   G.sel = -1; G.selN = 0; G.hint = null; G.idleT = G.inputT = t;
   const flyMs = CFG.FLY_MS;
   for (let k = 0; k < n; k++){
     const l = src.pop(), p0 = l.dragX !== null ? { x: l.dragX, y: l.dragY } : lampPose(l, t);
     l.ci = b; l.si = dst.length; dst.push(l);
-    const id = startFly(l, p0, k * CFG.FLY_STAGGER_MS);
-    after(k * CFG.FLY_STAGGER_MS + flyMs, () => { if (l.flyId === id) onLand(l); });
+    startFly(l, p0, k * CFG.FLY_STAGGER_MS); l.landCb = onLand;
   }
   Sound.fly(n); log('fx.start', 'fly', 'n=' + n);
   if (last.reveal && src.length){ const rl = src[src.length - 1]; after(150, () => revealFx(rl)); }       // тёмная стала крайней — загорается цветом
@@ -1207,12 +1256,13 @@ function doMove(a, b){
   if (last.completed){
     // Ввод не запирается: ядро провод уже освободило, и картинка тоже — гирлянда доигрывает сбор отдельным списком (V.gone),
     // следующий ход можно начинать, пока она светится и улетает. Запирает ввод только победа.
-    const seq = { ci: b, arr: dst, go: null, left: false, rush: false };
+    const seq = { ci: b, arr: dst, last, col: last.col, started: false, banged: false, left: false, go: null };
+    seq.go = () => leaveSeq(seq);
     if (RULES[G.s.v].leave){ V.cont[b] = []; for (const l of dst) l.grp = dst; V.gone.push(seq); }
     V.pending++;
     if (last.birdTo >= 0) V.birdDue = t + dur(landAll + 60 + dst.length * CFG.WAVE_STEP_MS + CFG.RAY_MS + CFG.BIRD_NOTICE_MS + CFG.BIRD_FLY_MS + 250);
     if (isWin(G.s)) G.lockUntil = Infinity;
-    after(landAll + 60, () => completeSeq(b, last, seq));
+    after(landAll + 60, () => completeSeq(seq));
   } else after(landAll + 80, checkStuck);
   hud();
   return true;
@@ -1250,48 +1300,66 @@ function onLand(l){
 // аккорд (с каждой гирляндой уровня выше), свет гирлянды заливает сцену, кадр вздрагивает, провод пружинит;
 // затем гирлянда улетает наверх (a) или колба закрывается (b), а итоговая гирлянда отвечает волной.
 // Ввод всё это время открыт; тронули этот провод — гирлянда улетает сразу (seq.go).
-function completeSeq(ci, last, seq){
-  const col = last.col, arr = seq.arr, per = arr.length, hex = colorHex(col), isA = G.s.v === 'a', c = contCenter(ci), nth = Math.max(0, G.s.done.indexOf(col));
-  log('fx.start', 'complete', 'c=' + ci + ' color=' + COLOR_NAMES[col]);
+// Сбор идёт тремя шагами: completeSeq (волна по лампам) → bangSeq (аккорд, свет, тепло, птица, золото) → leaveSeq (уход).
+// Игрок пошёл на этот провод раньше (settle) — leaveSeq срабатывает сразу, с любого места: аккорд звучит немедленно,
+// лампы летят наверх оттуда, где они сейчас (хоть из полёта). Шаги по таймеру после этого ничего не повторяют.
+function completeSeq(seq){
+  if (seq.started) return; seq.started = true;
+  const ci = seq.ci, arr = seq.arr, per = arr.length, hex = colorHex(seq.col), nth = Math.max(0, G.s.done.indexOf(seq.col));
+  log('fx.start', 'complete', 'c=' + ci + ' color=' + COLOR_NAMES[seq.col]);
   V.goldT[ci] = V.curT[ci] = now();
   arr.forEach((l, j) => after(j * CFG.WAVE_STEP_MS, () => {
+    if (seq.left) return;
     const t = now(); l.flashT = t; l.flashK = 1; twTo(l.lit, 1, t, 120); l.landT = t; l.landDir = j % 2 ? 1 : -1; l.popT = t; l.popK = 0.24;
     if (l.hid) revealFx(l, true);                          // тёмная в собранной гирлянде открывается вместе со всеми
     Sound.waveNote(j + nth); burst(l.px, l.py + bulbH() * 0.5, [hex, '#ffffff'], 6, 150, { life: 420, size: 7, g: 200 });
   }));
-  after(per * CFG.WAVE_STEP_MS, () => {
-    const t = now();
-    Sound.complete(nth); buzz([20, 40, 30]);
-    ring(c.x, c.y, hex, 20, 150, 620, 4); ring(c.x, c.y, '#ffffff', 10, 90, 460, 2);
-    burst(c.x, c.y, [hex, hex, PAL.warm, '#ffffff'], 30, 260, { life: 800, size: 10, g: 260 });
-    G.flash = { t0: t, d: dur(680), col: hex, x: c.x, y: c.y, a: 0.38 }; G.shake = { t0: t, amp: 2.6 };
-    if (!seq.left){ arr.forEach(l => { l.flashT = t; l.flashK = 1; l.popT = t; l.popK = 0.3; }); kick(ci, 4.5); }
-    if (last.thaw) thawFx(c.x, c.y);                       // первая гирлянда — волна тепла, иней трескается и тает
-    if (last.birdTo >= 0 && V.bird && V.bird.at !== G.s.bird){   // искра от гирлянды долетает до птицы: та подпрыгивает, показывает путь и летит по нему
-      const bp = wireEnd(V.bird.at); ray(c.x, c.y, bp.x, bp.y - 14, CFG.RAY_MS, PAL.warm);
-      after(CFG.RAY_MS, () => { if (V.bird && V.bird.at !== G.s.bird){ V.birdHopT = V.birdArcT = now(); Sound.chirp(); } });
-      after(CFG.RAY_MS + CFG.BIRD_NOTICE_MS, () => birdFly(G.s.bird));
-    }
-    if (last.gold === 'got') goldFx(c.x, c.y);             // золотая собрана вовремя — награда на месте
-  });
-  const leave = seq.go = () => {
-    if (seq.left) return; seq.left = true;
-    if (isA){                                            // гирлянда улетает на итоговый провод сверху
-      const base = V.top.length; V.gone = V.gone.filter(x => x !== seq); Sound.leave(); log('fx.start', 'leave'); kick(ci, -5);
-      arr.forEach((l, j) => {
-        const p0 = lampPose(l, now()); l.top = base + j; l.ci = -1; l.grp = null; V.top.push(l);
-        startFly(l, p0, j * CFG.LEAVE_STAGGER_MS, topPos(l.top), CFG.LEAVE_MS);
-        after(j * CFG.LEAVE_STAGGER_MS, () => twTo(l.sc, CFG.TOP_SCALE, now(), CFG.LEAVE_MS));
-        after(j * CFG.LEAVE_STAGGER_MS + CFG.LEAVE_MS, () => { const t = now(); l.landed = true; l.landT = t; l.flashT = t; l.flashK = 0.8; l.popT = t; l.popK = 0.4; Sound.ting(j + nth); });
-      });
-      after((per - 1) * CFG.LEAVE_STAGGER_MS + CFG.LEAVE_MS, () => { log('fx.end', 'leave'); log('fx.end', 'complete'); topWave(); afterComplete(); });
-    } else {                                             // колба закрывается крышкой и остаётся светить
-      V.capT[ci] = now(); log('fx.start', 'cap');
-      after(CFG.CAP_MS * 0.7, () => { Sound.cap(); buzz(18); const g = GEO.cont[ci]; if (g) burst(g.x, g.yBot - g.h, [hex, '#ffffff'], 10, 140, { life: 420, size: 6, up: true, spread: 2.6 }); });
-      after(CFG.CAP_MS, () => { log('fx.end', 'cap'); log('fx.end', 'complete'); afterComplete(); });
-    }
-  };
-  after(per * CFG.WAVE_STEP_MS + (seq.rush ? 80 : CFG.DONE_HOLD_MS), leave);
+  after(per * CFG.WAVE_STEP_MS, () => bangSeq(seq));
+  after(per * CFG.WAVE_STEP_MS + CFG.DONE_HOLD_MS, () => leaveSeq(seq));
+}
+function bangSeq(seq){
+  if (seq.banged) return; seq.banged = true;
+  const ci = seq.ci, arr = seq.arr, last = seq.last, hex = colorHex(seq.col), c = contCenter(ci), nth = Math.max(0, G.s.done.indexOf(seq.col)), t = now();
+  Sound.complete(nth); buzz([20, 40, 30]);
+  ring(c.x, c.y, hex, 20, 150, 620, 4); ring(c.x, c.y, '#ffffff', 10, 90, 460, 2);
+  burst(c.x, c.y, [hex, hex, PAL.warm, '#ffffff'], 30, 260, { life: 800, size: 10, g: 260 });
+  G.flash = { t0: t, d: dur(680), col: hex, x: c.x, y: c.y, a: 0.38 }; G.shake = { t0: t, amp: 2.6 };
+  arr.forEach(l => { l.flashT = t; l.flashK = 1; l.popT = t; l.popK = 0.3; twTo(l.lit, 1, t, 120); if (l.hid) revealFx(l, true); }); kick(ci, 4.5);
+  if (last.thaw) thawFx(c.x, c.y);                       // первая гирлянда — волна тепла, иней трескается и тает
+  if (last.birdTo >= 0 && V.bird && V.bird.at !== G.s.bird){   // искра от гирлянды долетает до птицы: та подпрыгивает, показывает путь и летит по нему
+    const bp = wireEnd(V.bird.at); ray(c.x, c.y, bp.x, bp.y - 14, CFG.RAY_MS, PAL.warm);
+    after(CFG.RAY_MS, () => { if (V.bird && V.bird.at !== G.s.bird){ V.birdHopT = V.birdArcT = now(); Sound.chirp(); } });
+    after(CFG.RAY_MS + CFG.BIRD_NOTICE_MS, () => birdFly(G.s.bird));
+  }
+  if (last.gold === 'got') goldFx(c.x, c.y);             // золотая собрана вовремя — награда на месте
+}
+function leaveSeq(seq){
+  if (seq.left) return;
+  const ci = seq.ci, arr = seq.arr, per = arr.length, hex = colorHex(seq.col), isA = G.s.v === 'a', nth = Math.max(0, G.s.done.indexOf(seq.col));
+  if (!seq.started){ seq.started = true; log('fx.start', 'complete', 'c=' + ci + ' color=' + COLOR_NAMES[seq.col] + ' early'); V.goldT[ci] = now(); }
+  bangSeq(seq);
+  seq.left = true;
+  if (isA){                                              // гирлянда улетает на итоговый провод сверху
+    const base = V.top.length; V.gone = V.gone.filter(x => x !== seq); Sound.leave(); log('fx.start', 'leave'); kick(ci, -5);
+    arr.forEach((l, j) => {
+      const p0 = lampPose(l, now()); l.top = base + j; l.ci = -1; l.grp = null; V.top.push(l);
+      startFly(l, p0, j * CFG.LEAVE_STAGGER_MS, 'top', CFG.LEAVE_MS);
+      after(j * CFG.LEAVE_STAGGER_MS, () => twTo(l.sc, CFG.TOP_SCALE, now(), CFG.LEAVE_MS));
+      l.landCb = () => { const t = now(); l.landed = true; l.landT = t; l.flashT = t; l.flashK = 0.8; l.popT = t; l.popK = 0.4; Sound.ting(j + nth); };
+    });
+    after((per - 1) * CFG.LEAVE_STAGGER_MS + CFG.LEAVE_MS, () => { log('fx.end', 'leave'); log('fx.end', 'complete'); topWave(); afterComplete(); });
+  } else {                                               // колба закрывается крышкой и остаётся светить
+    V.capT[ci] = now(); log('fx.start', 'cap');
+    after(CFG.CAP_MS * 0.7, () => { Sound.cap(); buzz(18); const g = GEO.cont[ci]; if (g) burst(g.x, g.yBot - g.h, [hex, '#ffffff'], 10, 140, { life: 420, size: 6, up: true, spread: 2.6 }); });
+    after(CFG.CAP_MS, () => { log('fx.end', 'cap'); log('fx.end', 'complete'); afterComplete(); });
+  }
+}
+// skipWin: касание после победного хода — гирлянды улетают сразу, финальная волна сокращается. Анимация не держит и здесь.
+function skipWin(){
+  if (!G.s || G.screen !== 'game' || !isWin(G.s)) return;
+  for (const q of V.gone.slice()) q.go();
+  if (G.ending) G.ending = Math.min(G.ending, now() + dur(CFG.WIN_SKIP_MS));
+  log('input', 'skip.win');
 }
 // topWave: итоговая гирлянда отвечает на пополнение — «ток» пробегает по всем собранным лампам
 function topWave(){ V.top.forEach((l, q) => after(q * 20, () => { const t = now(); l.flashT = t; l.flashK = 0.5; l.popT = t; l.popK = 0.16; })); }
@@ -1301,12 +1369,12 @@ function winSeq(){
   const t = now(), s = G.s, isA = s.v === 'a';
   log('event', 'level.win', 'v=' + s.v + ' level=' + (s.li + 1) + ' moves=' + s.moves + ' par=' + levelsOf(s.v)[s.li].par);
   log('fx.start', 'win'); Sound.win(); buzz([30, 50, 30, 50, 60]);
-  G.winT = t; G.shake = { t0: t, amp: 3.5 }; G.flash = { t0: t, d: dur(900), col: PAL.warm, x: W / 2, y: isA ? CFG.TOP_Y + 30 : H * 0.4, a: 0.42 };
+  G.winT = t; G.shake = { t0: t, amp: 3.5 }; G.flash = { t0: t, d: dur(900), col: PAL.warm, x: W / 2, y: isA ? topY() + 30 : H * 0.4, a: 0.42 };
   const lamps = isA ? V.top.slice() : [].concat(...V.cont).sort((p, q) => (p.px - q.px) || (q.py - p.py));
   const span = CFG.WIN_WAVE_MS * 0.42;
   lamps.forEach((l, q) => { for (let rep = 0; rep < 2; rep++) after(q * span / Math.max(1, lamps.length) + rep * span, () => { l.flashT = now(); l.flashK = 1; l.landT = now(); l.popT = now(); l.popK = 0.3; }); });
   const cols = s.done.map(colorHex);
-  for (let k = 0; k < 5; k++) after(k * 130, () => burst(W * (0.15 + 0.175 * k), isA ? CFG.TOP_Y + 20 : H * 0.3, cols.concat(['#ffffff']), 22, 300, { life: 1100, size: 10, g: 240 }));
+  for (let k = 0; k < 5; k++) after(k * 130, () => burst(W * (0.15 + 0.175 * k), isA ? topY() + 20 : H * 0.3, cols.concat(['#ffffff']), 22, 300, { life: 1100, size: 10, g: 240 }));
   G.ending = t + dur(CFG.WIN_WAVE_MS);
 }
 function finishWin(){
@@ -1468,13 +1536,29 @@ function checkStuck(){
   log('event', 'stuck', 'moves=' + G.s.moves);
   after(450, () => { if (G.s && G.screen === 'game' && isStuck(G.s)){ Sound.stuck(); goto('stuck'); } });
 }
+// Отмена в любой момент, кроме победы: ядро откатывается сразу, картинка собирается заново, а лампы отменённого хода летят назад
+// с того места, где их застала отмена (в полёте, на проводе, в улетающей гирлянде, на итоговом проводе).
 function undo(){
   if (!G.s || G.ending || now() < G.lockUntil || !G.s.hist.length) return;
-  const L = G.s.last;
+  const L = G.lasts.pop() || null, t = now();
+  let back = null;
+  if (L){
+    const gq = L.completed ? V.gone.find(q => q.col === L.col) : null;
+    const old = L.completed ? (gq ? gq.arr : V.top.filter(l => l.col === L.col)) : (V.cont[L.b] || []);    // лампы на проводе-цели в порядке мест; у гирлянды — вся она
+    back = old.map(l => { const p = lampPose(l, t); return { x: p.x, y: p.y, sc: twVal(l.sc, t) }; });
+  }
   G.s = undoMove(G.s); syncVisual(); Sound.undo(); log('input', 'undo', 'moves=' + G.s.moves); hud();
-  if (L && V.cont[L.a]){                                 // вернувшиеся лампы качнулись и мигнули: видно, что именно отменилось
-    const arr = V.cont[L.a], t = now();
-    for (let k = 0; k < L.n && k < arr.length; k++){ const l = arr[arr.length - 1 - k]; l.landT = t; l.landDir = k % 2 ? 1 : -1; l.flashT = t; l.flashK = 0.4; }
+  if (L && V.cont[L.a]){
+    const A = V.cont[L.a], B = V.cont[L.b] || [], nb = back.length, fl = [];
+    for (let k = 0; k < L.n && k < A.length; k++) fl.push([A[A.length - 1 - k], back[nb - L.n + k]]);      // перенесённые лампы: первая снятая села на цель первой
+    if (L.completed) for (let j = 0; j < B.length && j < nb - L.n; j++) fl.push([B[j], back[j]]);           // остальная гирлянда возвращается на свой провод
+    for (const [l, p0] of fl){
+      if (!p0) continue;
+      l.sc = tw(p0.sc); twTo(l.sc, 1, t, CFG.UNDO_FLY_MS); l.flashT = t; l.flashK = 0.4;
+      startFly(l, p0, 0, 'back', CFG.UNDO_FLY_MS);
+      l.landCb = () => { l.landed = true; l.landT = now(); relightArr(V.cont[l.ci], now()); };
+    }
+    relight(L.a, t, true); if (L.completed) relight(L.b, t, true);
     kick(L.a, 3);
   }
 }
@@ -1482,7 +1566,7 @@ function useSpare(){
   if (!G.s || G.ending || now() < G.lockUntil) return;
   if (G.s.spare >= CFG.SPARE_PER_LEVEL){ toast(G.s.v === 'a' ? 'Запасной провод уже добавлен' : 'Запасная колба уже добавлена'); return; }
   if (G.sel >= 0) select(-1, true);
-  G.s = addSpare(G.s); V.cont.push([]); layout();
+  G.s = addSpare(G.s); G.lasts.push(null); V.cont.push([]); layout();
   const i = V.cont.length - 1, c = contCenter(i);
   V.bornT[i] = now(); Sound.spare(); buzz(15);
   ring(c.x, c.y, PAL.warm, 10, 80, 500, 3);
@@ -1499,41 +1583,109 @@ function showHint(auto){
 }
 
 // --- ввод: Pointer Events, порог тап/драг, pointercancel = pointerup (§3) ---
+// Темп: всё решается на КАСАНИИ, а не на отпускании — выбор, ход, отказ, снятие выбора. Отпускание значит что-то только для
+// перетаскивания. Поэтому два пальца внахлёст (второй коснулся цели, пока первый ещё лежит на источнике) не теряют ход,
+// а полёт прошлых ламп ввод не запирает: ядро уже впереди, лампы долетают по своей очереди и подстраиваются под новое состояние.
 function toVirtual(e){ const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / scale, y: (e.clientY - r.top) / scale }; }
+// dragAim: середина несомой группы. Цель перетаскивания выбирается по ней, а не по пальцу: лампы нарисованы выше пальца, игрок целится ими.
+function dragAim(d){ return { x: d.x, y: d.y - CFG.DRAG_GAP - bulbH() * 0.5 }; }
+// contDist: расстояние от точки до ряда ламп контейнера (вариант a — отрезок провода на высоте середины ламп; b — колба с зоной над горлышком)
+function contDist(g, p){
+  if (G.s.v === 'a'){
+    const xa = Math.min(g.x0, g.x0 + g.dir * g.len), xb = Math.max(g.x0, g.x0 + g.dir * g.len);
+    return Math.hypot(p.x < xa ? xa - p.x : p.x > xb ? p.x - xb : 0, p.y - (g.y + bulbH() * (0.5 - CFG.BULB_HOOK_K) + 2));
+  }
+  const top = g.yBot - g.h - CFG.B_ROW_GAP * GEO.k * 0.9;
+  return Math.hypot(Math.max(0, Math.abs(p.x - g.x) - GEO.tw / 2), p.y < top ? top - p.y : p.y > g.yBot ? p.y - g.yBot : 0);
+}
+// dropTarget(p — перетаскивание): куда сядут лампы, если отпустить сейчас. to — ближайший ПОДХОДЯЩИЙ контейнер в радиусе прилипания (у него фора перед
+// неподходящим соседом и липкость, если он уже подсвечен); no — лампа прямо над неподходящим (отпустил — мягкий отказ);
+// оба −1 — лампа над своим проводом или в пустоте (вернётся на место).
+// Меряется от «несомой колонки» — отрезка от середины лампы до пальца: лампа в приоритете, палец со штрафом DROP_FINGER_PEN.
+// Так садится и тот, кто целится лампой (она выше пальца), и тот, кто по привычке кладёт на провод палец.
+function carryDist(g, d){
+  const lamp = dragAim(d);
+  return Math.min(contDist(g, lamp), contDist(g, { x: d.x, y: (lamp.y + d.y) / 2 }) + CFG.DROP_FINGER_PEN * 0.5, contDist(g, d) + CFG.DROP_FINGER_PEN);
+}
+function dropTarget(p, cur){
+  const s = G.s, from = G.sel, isA = s.v === 'a', unit = isA ? GEO.rowH : GEO.tw + CFG.B_GAP * GEO.k;
+  let bv = -1, dv = 1e9, bn = -1, dn = 1e9;
+  for (const g of GEO.cont){
+    if (g.i === GEO.ghost) continue;
+    let d = carryDist(g, p);
+    if (g.i !== from && canMove(s, from, g.i)){ if (g.i === cur) d -= CFG.DROP_STICK; if (d < dv){ dv = d; bv = g.i; } }
+    else if (d < dn){ dn = d; bn = g.i; }
+  }
+  if (bv >= 0 && dv <= unit * CFG.DROP_SNAP_K && dv <= dn + (bn === from ? 0 : unit * CFG.DROP_BIAS_K)) return { to: bv, no: -1 };
+  if (bn >= 0 && bn !== from && dn <= (isA ? GEO.rowH * 0.5 : CFG.HIT_PAD)) return { to: -1, no: bn };
+  return { to: -1, no: -1 };
+}
+function startDrag(d, p){
+  const t = now();
+  for (const l of selLamps()){ const q = lampPose(l, t); l.dragFrom = { x: q.x, y: q.y }; if (l.fly){ l.fly = null; l.flyId++; l.landCb = null; l.landed = true; } }   // лампу можно подхватить и в полёте
+  G.drag = { x: p.x, y: p.y, t0: t, lt: t, vx: 0, over: -1, overT: t, no: -1, armed: false };
+  if (G.hint && G.hint.auto) G.hint = null;
+  log('input', 'drag.start', 'c=' + d.ci);
+}
+// retarget: провод под несомой лампой сменился — подсветка, тихий тик и толчок вибрации («навёлся»)
+function retarget(){
+  const g = G.drag, tg = g.armed ? dropTarget(g, g.over) : { to: -1, no: -1 };
+  g.no = tg.no;
+  if (tg.to !== g.over){ g.over = tg.to; g.overT = now(); if (tg.to >= 0){ Sound.aim(); buzz(6); kick(tg.to, 1.2); } }
+}
+// endDrag: отпустили (p — где; null — касание сорвано, берём последнее место). Над подсвеченным проводом — ход (и при срыве тоже:
+// игрок видел подсветку, а отмена бесплатная); над неподходящим — мягкий отказ; иначе лампы возвращаются.
+// Не «взведённое» перетаскивание (палец дрогнул на тапе) — это тап: лампы остаются приподнятыми.
+function endDrag(d, p, cancel){
+  const g = G.drag, from = G.sel, lamps = selLamps(), t = now();
+  if (p){ g.x = p.x; g.y = p.y; if (!g.armed && Math.hypot(p.x - d.x, p.y - d.y) > CFG.DRAG_ARM) g.armed = true; }
+  const tg = g.armed ? dropTarget(g, g.over) : { to: -1, no: -1 };
+  for (const l of lamps) lampPose(l, t);                  // где лампы сейчас — оттуда они полетят
+  G.drag = null;
+  if (tg.to >= 0 && canInput()){ log('input', 'drop', from + '>' + tg.to + (cancel ? ' cancel' : '')); doMove(from, tg.to); return; }
+  const keep = !g.armed && !d.wasSel;
+  if (tg.no >= 0 && !cancel) bad(tg.no, whyNot(G.s, posOf(G.s), from, tg.no), from);
+  for (const l of lamps){
+    startFly(l, { x: l.px, y: l.py }, 0, 'back', 200); if (keep) l.lift = tw(1);
+    l.landCb = () => { l.landed = true; relightArr(V.cont[l.ci], now()); };
+  }
+  if (!keep){ G.sel = -1; G.selN = 0; }
+  log('input', 'drag.cancel', keep ? 'keep' : cancel ? 'lost' : '');
+}
 cv.addEventListener('pointerdown', (e) => {
   Sound.init();
-  if (!canInput()) return;
-  const p = toVirtual(e), ci = containerAt(p);
-  G.down = { id: e.pointerId, x: p.x, y: p.y, ci, moved: false, picked: false };
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  if (G.drag){ if (!e.isPrimary) return; if (G.down) endDrag(G.down, null, true); G.down = null; }   // второй палец перетаскиванию не мешает; новое первое касание при «висящем» старом — старое сорвано
+  if (!canInput()){ skipWin(); return; }
+  const p = toVirtual(e), ci = containerAt(p), d = { id: e.pointerId, x: p.x, y: p.y, ci, moved: false, picked: false, wasSel: false };
+  G.down = d;
   try { cv.setPointerCapture(e.pointerId); } catch (err) {}
-  if (ci >= 0 && G.sel < 0 && liftable(ci)){ noteInput(); select(ci); G.down.picked = true; }    // лампы приподнимаются сразу под пальцем
+  if (ci >= 0 && G.sel === ci){ noteInput(); d.picked = d.wasSel = true; }                   // лампы уже приподняты: потянул — понёс, отпустил на месте — положил обратно
+  else if (ci >= 0 && G.sel < 0 && liftable(ci)){ noteInput(); select(ci); d.picked = true; }   // лампы приподнимаются сразу под пальцем
+  else { tapContainer(ci); if (ci >= 0 && G.sel === ci) d.picked = true; }                    // ход, отказ, снятие выбора — на касании; после отказа выбор перескочил сюда — можно сразу нести
 });
 cv.addEventListener('pointermove', (e) => {
   const d = G.down; if (!d || e.pointerId !== d.id) return;
-  const p = toVirtual(e);
-  if (!d.moved && Math.hypot(p.x - d.x, p.y - d.y) > CFG.DRAG_PX / scale){ d.moved = true; if (d.picked && G.sel === d.ci){ G.drag = { x: p.x, y: p.y, over: -1 }; log('input', 'drag.start', 'c=' + d.ci); } }
-  if (G.drag){ G.drag.x = p.x; G.drag.y = p.y; const o = containerAt(p); G.drag.over = o >= 0 && o !== G.sel && canMove(G.s, G.sel, o) ? o : -1; }
+  const p = toVirtual(e), far = Math.hypot(p.x - d.x, p.y - d.y);
+  if (!d.moved && far > CFG.DRAG_PX){ d.moved = true; if (d.picked && G.sel === d.ci && canInput()) startDrag(d, p); }
+  const g = G.drag; if (!g) return;
+  const t = now(), dt = Math.max(1, t - g.lt);
+  g.vx += ((p.x - g.x) / dt - g.vx) * Math.min(1, dt / 50); g.lt = t; g.x = p.x; g.y = p.y;
+  if (!g.armed && far > CFG.DRAG_ARM) g.armed = true;
+  retarget();
 });
 function onUp(e){
   const d = G.down; if (!d || e.pointerId !== d.id) return;
   G.down = null;
-  const p = toVirtual(e), cancel = e.type === 'pointercancel';
-  if (G.drag){                                            // отпустили группу: над подходящим контейнером — ход, иначе назад
-    const from = G.sel, to = cancel ? -1 : containerAt(p);
-    const lamps = selLamps(), t = now();
-    G.drag = null;
-    if (to >= 0 && to !== from && canMove(G.s, from, to)){ doMove(from, to); return; }
-    if (to >= 0 && to !== from) bad(to, whyNot(G.s, posOf(G.s), from, to), from);
-    for (const l of lamps){ const p0 = { x: l.px, y: l.py }; const id = startFly(l, p0, 0); l.fly.length = 1; l.fly[0].x1 = slotPos(l.ci, l.si).x; l.fly[0].y1 = slotPos(l.ci, l.si).y; l.fly[0].d = dur(200); l.fly[0].arc = 0;
-      after(200, () => { if (l.flyId === id) l.landed = true; }); }
-    G.sel = -1; G.selN = 0; log('input', 'drag.cancel');
-    return;
-  }
+  const cancel = e.type !== 'pointerup';
+  if (G.drag){ endDrag(d, cancel ? null : toVirtual(e), cancel); return; }
   if (cancel) return;
-  if (d.picked) return;                                   // первый тап уже приподнял лампы на нажатии
-  tapContainer(d.ci);
+  if (d.wasSel && G.sel === d.ci && canInput()){ noteInput(); select(-1); }                   // тап по уже приподнятым лампам — положить на место
 }
-cv.addEventListener('pointerup', onUp); cv.addEventListener('pointercancel', onUp);
+cv.addEventListener('pointerup', onUp); cv.addEventListener('pointercancel', onUp); cv.addEventListener('lostpointercapture', onUp);
+// iOS и встроенные браузеры (Slack, Telegram): без этого долгое касание зовёт лупу и выделение, а протяжку может забрать система — касание срывается
+for (const tn of ['touchstart', 'touchmove']) $('game').addEventListener(tn, (e) => { if (e.cancelable) e.preventDefault(); }, { passive: false });
+$('game').addEventListener('contextmenu', (e) => e.preventDefault());
 document.addEventListener('keydown', (e) => {          // дубли на клавиатуру для отладки (§3)
   if (e.key >= '1' && e.key <= '9' && G.s){ const i = +e.key - 1; if (i < V.cont.length) tapContainer(i); }
   if (e.key === 'z' || e.key === 'u') undo();
@@ -1550,11 +1702,26 @@ $('btn-menu').onclick = () => { Sound.init(); Sound.ui(); log('input', 'button',
 $('btn-mute').onclick = () => { G.save.muted = !G.save.muted; save(); hud(); Sound.init(); Sound.ui(); log('input', 'button', 'mute=' + G.save.muted); };
 
 // --- размер: resize + orientationchange + периодический пересчёт (§2) ---
+// fitFrame: масштаб кадра. Окно не шире расчётного кадра (обычный телефон) или альбомное (десктоп) — масштаб 1, как раньше.
+// Окно шире и портретное — кадр расчётной ширины растягивается на всю ширину окна (но не ниже FRAME_MIN_H расчётной высоты).
+// Так игра не превращается в узкую колонку, когда браузер телефона отдаёт широкий layout viewport («версия для ПК»: 980 px при 440 → 45% ширины).
+// Экранные кнопки навигации тут ни при чём: они отнимают только высоту окна.
+let frameK = 1;
+function fitFrame(){
+  const de = document.documentElement, vw = de.clientWidth || window.innerWidth, vh = de.clientHeight || window.innerHeight; if (!vw || !vh) return;
+  const k = vw > CFG.FRAME_W && vh > vw ? Math.max(1, Math.min(vw / CFG.FRAME_W, vh / CFG.FRAME_MIN_H)) : 1, f = $('frame');
+  if (Math.abs(k - frameK) > 0.002 || !f.dataset.fit){ frameK = k; f.dataset.fit = '1'; f.style.setProperty('--fk', k.toFixed(4)); f.classList.toggle('zoom', k !== 1); log('event', 'frame', 'window=' + vw + 'x' + vh + ' k=' + k.toFixed(3)); }
+  f.classList.toggle('narrow', f.clientWidth <= CFG.FRAME_NARROW);
+}
 function fit(){
-  const r = $('game').getBoundingClientRect(); if (!r.width || !r.height) return;
-  const dpr = Math.min(window.devicePixelRatio || 1, 2), w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+  fitFrame();
+  const r = $('game').getBoundingClientRect(); if (!r.width || !r.height) return;              // размер на экране, уже с масштабом кадра
+  const dpr = Math.min(window.devicePixelRatio || 1, 2, CFG.CANVAS_MAX_W / r.width), w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
   DPR = dpr; scale = r.width / VW; W = VW; H = r.height / scale;
-  if (cv.width !== w || cv.height !== h){ cv.width = w; cv.height = h; layout(); }
+  // безопасные зоны: CSS считает их в единицах кадра (#sa), в виртуальные юниты — через ширину кадра до масштаба
+  const cs = getComputedStyle($('sa')), u = VW / ($('frame').clientWidth || VW), st = (parseFloat(cs.paddingTop) || 0) * u, sb = (parseFloat(cs.paddingBottom) || 0) * u;
+  const moved = Math.abs(st - SAFE.top) > 0.5 || Math.abs(sb - SAFE.bottom) > 0.5; SAFE.top = st; SAFE.bottom = sb;
+  if (cv.width !== w || cv.height !== h){ cv.width = w; cv.height = h; layout(); } else if (moved) layout();
 }
 let fitTimer = 0;
 const refit = () => { clearTimeout(fitTimer); fitTimer = setTimeout(fit, 140); };
@@ -1832,11 +1999,33 @@ function drawWire(c, g, t, ghost){
     glow(c, PAL.ice, (x1 + x2) / 2, g.y + 4, g.len * 1.3, 0.12 * icy);
   }
 }
+// drawDrop: пока несут лампы — провод, на который они сядут, если отпустить: тёплая подсветка провода и силуэты ламп на местах посадки.
+// Подсвечивается один провод — тот, что под лампой; все возможные ходы не показываются (это подсказывало бы решение).
+function drawDrop(c, t){
+  const d = G.drag, s = G.s; if (!d || d.over < 0 || !s) return;
+  const g = GEO.cont[d.over], n = canMove(s, G.sel, d.over), arr = V.cont[d.over] || [], lamps = selLamps(), top = lamps[lamps.length - 1]; if (!g || !n) return;
+  const a = ease((t - d.overT) / dur(120)), pulse = 0.5 + 0.5 * Math.sin(t / 150), hex = top ? colorHex(top.col) : PAL.warm, h = bulbH();
+  c.save();
+  if (s.v === 'a'){
+    const x1 = g.x0, x2 = g.x0 + g.dir * g.len, mx = (x1 + x2) / 2, my = g.y + 2 * sagOf(g.i);
+    c.globalCompositeOperation = 'lighter'; c.lineCap = 'round'; c.strokeStyle = PAL.warm;
+    c.globalAlpha = (0.2 + 0.12 * pulse) * a; c.lineWidth = 10; c.beginPath(); c.moveTo(x1, g.y); c.quadraticCurveTo(mx, my, x2, g.y); c.stroke();
+    c.globalAlpha = (0.7 + 0.25 * pulse) * a; c.lineWidth = 2.8; c.beginPath(); c.moveTo(x1, g.y); c.quadraticCurveTo(mx, my, x2, g.y); c.stroke();
+    c.globalCompositeOperation = 'source-over';
+  }
+  const im = top ? spr('bulb-off-' + COLOR_NAMES[top.col]) : null;
+  for (let j = 0; j < n; j++){
+    const p = slotPos(d.over, arr.length + j);
+    if (im){ const w = h * im.width / im.height; c.globalAlpha = CFG.DROP_GHOST_A * (0.8 + 0.2 * pulse) * a; c.drawImage(im, p.x - w / 2, p.y - h * CFG.BULB_HOOK_K, w, h); }
+    c.globalAlpha = (0.55 + 0.3 * pulse) * a; c.strokeStyle = hex; c.lineWidth = 2; c.beginPath(); c.arc(p.x, p.y + h * 0.5, GEO.r * 1.2, 0, Math.PI * 2); c.stroke();
+  }
+  c.restore();
+}
 // drawTopWire: итоговая гирлянда сверху (вариант a) — сюда улетают собранные цвета
 function drawTopWire(c){
   const N = G.s.colors * G.s.per + G.s.wild;
   c.lineCap = 'round'; c.strokeStyle = PAL.wire; c.lineWidth = 2.6;
-  c.beginPath(); c.moveTo(0, CFG.TOP_Y); c.quadraticCurveTo(W / 2, CFG.TOP_Y + 2 * CFG.TOP_SAG, W, CFG.TOP_Y); c.stroke();
+  const ty = topY(); c.beginPath(); c.moveTo(0, ty); c.quadraticCurveTo(W / 2, ty + 2 * CFG.TOP_SAG, W, ty); c.stroke();
   c.fillStyle = PAL.socket;
   for (let q = V.top.length; q < N; q++){ const p = topPos(q); c.beginPath(); c.arc(p.x, p.y + 0.5, 2.2, 0, Math.PI * 2); c.fill(); }
 }
@@ -1967,6 +2156,7 @@ function render(){
   // 1. контейнеры
   if (isA){ drawTopWire(ctx); for (const g of GEO.cont) drawWire(ctx, g, t, g.i === GEO.ghost); }
   else for (const g of GEO.cont) drawTube(ctx, g, t, g.i === GEO.ghost);
+  drawDrop(ctx, t);
   // 2. лампы: позы → свечение → спрайты (стоящие, потом летящие и приподнятые)
   const poses = [];
   const add = (l) => { const p = lampPose(l, t), lf = twVal(l.lift, t), look = lampLook(l, t); p.l = l; p.dark = look.dark; p.frost = look.frost; p.goldA = look.goldA;
@@ -1993,13 +2183,13 @@ setInterval(() => { if (performance.now() - lastFrame > 120 && !G.paused) safeRe
 
 // --- дебаг-хук (§6): состояние, любой экран, прогон времени, автоигра ---
 window.GIRLYANDA_SORT = {
-  G, V, GEO, CFG,
+  G, V, GEO, CFG, VERSION,
   state(){
     const s = G.s; if (!s) return { screen: G.screen, variant: G.v };
     // tubes — лампы словами: цифра цвета (6 — перламутровая), * иней, ? тёмная, $ золотой патрон; raw — строки ядра
     const word = (str) => Array.from(str, (_, j) => { const x = lampAt(str, j); return (x & COLOR) + (x & ICE ? '*' : '') + (x & HID ? '?' : '') + (x & GOLD ? '$' : ''); }).join('');
     return { screen: G.screen, variant: s.v, level: s.li + 1, tubes: s.tubes.map(word), raw: s.tubes.slice(), caps: s.caps.slice(), done: s.done.slice(), moves: s.moves, par: levelsOf(s.v)[s.li].par,
-      spare: s.spare, sel: G.sel, win: isWin(s), stuck: isStuck(s), locked: now() < G.lockUntil, legal: legalMoves(s).length,
+      version: VERSION, spare: s.spare, sel: G.sel, drag: G.drag ? { over: G.drag.over, no: G.drag.no, armed: G.drag.armed } : null, pending: V.pending, win: isWin(s), stuck: isStuck(s), locked: now() < G.lockUntil, legal: legalMoves(s).length,
       mech: Object.keys(levelsOf(s.v)[s.li].mech || {}), bird: s.bird, ice: s.ice, sock: s.sock.slice(), gold: s.gold ? Object.assign({}, s.gold) : null, last: s.last ? Object.assign({}, s.last) : null,
       spot: G.spot ? G.spot.kind : '', lesson: G.lesson ? { keys: G.lesson.keys.filter(k => !learned(k)), bump: G.lesson.bump } : null, hand: G.hint && G.hint.auto ? { a: G.hint.a, b: G.hint.b } : null,
       seen: Object.assign({}, G.save.seen), goldLevels: Object.keys(G.save.gold[s.v]).length, frameErrors: G.frameErrors, lastError: G.lastError };
@@ -2026,20 +2216,42 @@ window.GIRLYANDA_SORT = {
   goto(screen){ route(screen); return G.screen; },
   spot(kind){ const L = G.s ? levelsOf(G.s.v)[G.s.li] : null, k = kind || (L && (L.intro || Object.keys(L.mech || {})[0])); if (k) spot(k, true); return G.spot ? G.spot.kind : ''; },   // блик механики ещё раз
   lessonMove(){ return lessonMove(); },
-  // probe(): сверка для стенда касаний — визуальная модель против ядра, выбор, рука урока. Возвращает список расхождений (пусто = всё сходится).
-  probe(){
-    const s = G.s, out = []; if (!s) return out;
-    const calm = now() >= G.lockUntil && !G.ending;       // пока гирлянда собирается и улетает, её лампы ещё висят на проводе — сверять рано
+  // probe(settled): сверка для стендов — визуальная модель против ядра, выбор, рука урока. Возвращает список расхождений (пусто = всё сходится).
+  // Сверять можно в любой момент: ядро и картинка обязаны сходиться и посреди полёта, и посреди сбора гирлянды.
+  // settled = true — ещё и «всё доиграно»: ни одной лампы в полёте, все на своих местах, сборы закончены.
+  probe(settled){
+    const s = G.s, out = [], t = now(); if (!s) return out;
     if (V.cont.length !== s.tubes.length) out.push('контейнеров ' + V.cont.length + ' ≠ ' + s.tubes.length);
-    if (calm) s.tubes.forEach((str, i) => { const arr = V.cont[i] || []; if (arr.length !== str.length) out.push('провод ' + i + ': ламп ' + arr.length + ' ≠ ' + str.length); else for (let j = 0; j < str.length; j++) if (arr[j].col !== colAt(str, j)) out.push('провод ' + i + ':' + j + ' цвет'); });
+    s.tubes.forEach((str, i) => { const arr = V.cont[i] || []; if (arr.length !== str.length) out.push('провод ' + i + ': ламп ' + arr.length + ' ≠ ' + str.length); else for (let j = 0; j < str.length; j++){ if (arr[j].col !== colAt(str, j)) out.push('провод ' + i + ':' + j + ' цвет'); if (arr[j].ci !== i || arr[j].si !== j) out.push('провод ' + i + ':' + j + ' лампа числится на ' + arr[j].ci + ':' + arr[j].si); } });
     for (const arr of V.cont) for (const l of arr) if (!isFinite(l.px) || !isFinite(l.py)) out.push('лампа без места');
+    if (G.lasts.length !== s.hist.length) out.push('история оболочки ' + G.lasts.length + ' ≠ истории ядра ' + s.hist.length);
+    if (RULES[s.v].leave){ const want = s.done.reduce((n, c) => n + perOf(s, c), 0), have = V.top.length + V.gone.reduce((n, q) => n + q.arr.length, 0); if (want !== have) out.push('собрано ламп ' + have + ' ≠ ' + want); }
+    if (V.gone.length > V.pending) out.push('гирлянд в сборе ' + V.gone.length + ' > ожидаемых ' + V.pending);
     if (G.sel >= s.tubes.length || (G.sel >= 0 && !s.tubes[G.sel].length)) out.push('выбран пустой или несуществующий провод ' + G.sel);
+    if (G.sel >= 0 && RULES[s.v].group && G.selN !== topRun(s.tubes[G.sel])) out.push('приподнято ' + G.selN + ' ламп, крайняя группа — ' + topRun(s.tubes[G.sel]));
+    if (G.drag && G.sel < 0) out.push('перетаскивание без выбранного провода');
+    if (G.drag && G.drag.over >= 0 && !canMove(s, G.sel, G.drag.over)) out.push('подсвечен провод ' + G.drag.over + ', куда лампы сесть не могут');
     if (G.sel < 0 && !G.drag) for (const arr of V.cont) for (const l of arr) if (l.lift.b > 0) out.push('лампа осталась приподнятой');
     if (G.hint && G.hint.auto && !canMove(s, G.hint.a, G.hint.b)) out.push('рука урока показывает невозможный ход ' + G.hint.a + '>' + G.hint.b);
-    if (V.bird && !flyingBird() && now() >= V.birdDue && V.pending === 0 && V.bird.at !== s.bird) out.push('птица нарисована на ' + V.bird.at + ', в ядре ' + s.bird);
+    if (V.bird && !flyingBird() && t >= V.birdDue && V.pending === 0 && V.bird.at !== s.bird) out.push('птица нарисована на ' + V.bird.at + ', в ядре ' + s.bird);
+    if (settled){
+      if (V.pending || V.gone.length) out.push('сбор не доигран: pending ' + V.pending + ', gone ' + V.gone.length);
+      const all = [].concat(...V.cont, V.top);
+      for (const l of all){
+        if (!l.landed || l.fly){ out.push('лампа всё ещё в полёте (' + l.ci + ':' + l.si + ' top ' + l.top + ')'); break; }
+        const p = lampPose(l, t), b = l.top >= 0 ? topPos(l.top) : slotPos(l.ci, l.si), up = l.top < 0 && l.ci === G.sel ? 40 : 0;
+        if (Math.abs(p.x - b.x) > 6 || p.y - b.y > 6 || b.y - p.y > 6 + up){ out.push('лампа не на месте (' + l.ci + ':' + l.si + ' top ' + l.top + '): ' + Math.round(p.x) + ',' + Math.round(p.y) + ' ≠ ' + Math.round(b.x) + ',' + Math.round(b.y)); break; }
+      }
+    }
     if (G.frameErrors) out.push('ошибок кадра ' + G.frameErrors + ': ' + G.lastError);
     return out;
-  },                                    // какой ход показала бы рука урока сейчас
+  },
+  // aim(): на сколько (в виртуальных юнитах) середина несомой лампы выше пальца — стенд ведёт палец так, чтобы лампа пришла на провод
+  aim(){ return { dy: CFG.DRAG_GAP + bulbH() * 0.5, arm: CFG.DRAG_ARM }; },
+  // frame(): рамка — окно, масштаб кадра, размер холста, безопасные зоны
+  frame(){ const f = $('frame').getBoundingClientRect(); return { window: [window.innerWidth, window.innerHeight], k: frameK, frame: [Math.round(f.width), Math.round(f.height)], canvas: [cv.width, cv.height], dpr: DPR, scale, safe: Object.assign({}, SAFE) }; },
+  // safe(top, bottom): подставить безопасные зоны (CSS px окна), как на телефоне с чёлкой и полоской жестов; без аргументов — вернуть настоящие
+  safe(top, bottom){ const f = $('frame'); if (top === undefined){ f.style.removeProperty('--sat'); f.style.removeProperty('--sab'); } else { f.style.setProperty('--sat', 'calc(' + top + 'px / var(--fk))'); f.style.setProperty('--sab', 'calc(' + (bottom || 0) + 'px / var(--fk))'); } fit(); return Object.assign({}, SAFE); },
   forget(kind){ if (kind) delete G.save.seen[kind]; else G.save.seen = {}; save(); return Object.assign({}, G.save.seen); },   // забыть уроки (все или один) — пройти обучение заново
   why(a, b){ return G.s ? (b === undefined ? liftWhy(a) : whyNot(G.s, posOf(G.s), a, b)) : ''; },
   drive(sec){                                   // ручной прогон игрового времени: rAF заморожен в скрытой вкладке
@@ -2057,7 +2269,7 @@ readPalette(); loadArt(); fit(); hud();
 try { if (document.fonts && document.fonts.load) document.fonts.load('800 16px Nunito'); } catch (e) {}
 route(location.hash.slice(1));
 requestAnimationFrame(frame);
-log('event', 'boot', 'variant=' + G.v + ' levels=' + LEVELS.a.length + '+' + LEVELS.b.length);
+log('event', 'boot', 'v' + VERSION + ' variant=' + G.v + ' levels=' + LEVELS.a.length + '+' + LEVELS.b.length);
 </script>
 </body>
 </html>
