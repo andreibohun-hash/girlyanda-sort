@@ -122,6 +122,16 @@ footer button.pulse{animation:pulse .8s ease-in-out 2}
 .lvwrap{max-height:min(44vh,300px);overflow-y:auto;margin:10px -4px 2px;padding:6px 4px 2px;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 .lvwrap .levels{margin:0}
 .card .col{display:flex;flex-direction:column;gap:9px;align-items:stretch;margin-top:4px}
+/* рука-подсказка на кнопке (Undo, + wire) на уровне её открытия: DOM поверх кнопок и карточек, ввод не перехватывает */
+#coach{position:absolute;left:0;top:0;width:42px;height:46px;margin:-4px 0 0 -20px;pointer-events:none;z-index:7;transform-origin:20px 4px;animation:coachTap 1.1s ease-in-out infinite}
+#coach.hide{display:none}
+#coach:before{content:"";position:absolute;left:-2px;top:-18px;width:44px;height:44px;border-radius:50%;border:2.5px solid rgba(255,255,255,.85);animation:coachRing 1.1s ease-out infinite}
+#coach svg{display:block;width:42px;height:46px;overflow:visible}
+@keyframes coachTap{0%,100%{transform:translate(5px,12px) rotate(-23deg)}45%{transform:translate(0,2px) rotate(-23deg) scale(.93)}}
+#coach.down{animation-name:coachTapDown}   /* кнопки у нижнего края: рука сверху, указывает вниз */
+@keyframes coachTapDown{0%,100%{transform:translate(-5px,-12px) rotate(157deg)}45%{transform:translate(0,-2px) rotate(157deg) scale(.93)}}
+@keyframes coachRing{0%,40%{transform:scale(.4);opacity:0}50%{opacity:1}100%{transform:scale(1.15);opacity:0}}
+@media (prefers-reduced-motion: reduce){ #coach,#coach:before{animation:none} }
 .adbox{margin:8px auto 14px;width:150px;height:96px;border-radius:18px;display:grid;place-items:center;font-size:34px;font-weight:1000;color:var(--ink-dark);background:linear-gradient(#ffe066,#ffb22e)}
 @media (prefers-reduced-motion: reduce){ .card,.star.on,.ib.nudge,footer button.pulse{animation:none} .ib.nudge{box-shadow:0 0 0 4px rgba(255,207,51,.3)} #toast{transition:none} }
 </style>
@@ -138,11 +148,12 @@ footer button.pulse{animation:pulse .8s ease-in-out 2}
     <button class="ib" id="btn-menu" aria-label="pause"><svg viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h14"/></svg></button>
   </header>
   <footer>
-    <button id="btn-undo"><svg viewBox="0 0 24 24"><path d="M9 7L4 12l5 5M4 12h10a6 6 0 0 1 0 12"/></svg>Undo</button>
+    <button id="btn-undo"><svg viewBox="0 0 24 24"><path d="M9 7L4 12l5 5M4 12h10a6 6 0 0 1 0 12"/></svg>Undo<i class="ad">AD</i></button>
     <button id="btn-spare"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span id="spare-label">wire</span><i class="ad">AD</i></button>
   </footer>
   <div id="overlay"><div class="card" id="card"></div></div>
   <div id="toast" class="hide"></div>
+  <div id="coach" class="hide"><svg viewBox="-20 -4 42 46"><g stroke="#17142e" stroke-width="5" stroke-linejoin="round" fill="#fff8ec"><rect x="-5.5" y="0" width="11" height="27" rx="5.5"/><rect x="-7.5" y="15" width="25" height="23" rx="8.5"/><rect x="-15.5" y="19" width="11.5" height="15" rx="5.5"/></g><g fill="#fff8ec"><rect x="-5.5" y="0" width="11" height="27" rx="5.5"/><rect x="-7.5" y="15" width="25" height="23" rx="8.5"/><rect x="-15.5" y="19" width="11.5" height="15" rx="5.5"/></g></svg></div>
 </div>
 <script>
 'use strict';
@@ -747,7 +758,7 @@ const DEV = false;
 const TITLE = 'Twinkle Sort';                         // рабочее название (name-check 16.11: свободно в Play и App Store); финальное Андрей не выбрал — менять только здесь
 const API = TITLE.replace(/[^A-Za-z0-9]/g, '');       // window.TwinkleSort — пауза для обёртки
 const NAME = 'girlyanda-sort';                        // ключ сохранения: прогресс переживает смену названия
-const VERSION = '0.6.0';                              // видна в меню: по ней плейтестер и мы понимаем, какая сборка открыта
+const VERSION = '0.6.1';                              // видна в меню: по ней плейтестер и мы понимаем, какая сборка открыта
 const T0 = performance.now();
 let clockSkew = 0;                                    // drive() двигает игровые часы вперёд без ожидания
 let pauseAt = 0;                                      // момент паузы (фон, реклама, обёртка): пока стоит, игровые часы стоят на нём
@@ -760,8 +771,8 @@ const SAVE_KEY = NAME + '.v1';
 function loadSave(){ try { return JSON.parse(localStorage.getItem(SAVE_KEY)) || {}; } catch (e) { return {}; } }
 function save(){ try { localStorage.setItem(SAVE_KEY, JSON.stringify(G.save)); } catch (e) {} }
 // unlockAll — чит (PROTO-BASE §6); gold — уровни, где взят бонус золотой лампы; seen — уроки механик: 1 — механика встречена (блик был), 2 — правило прожито
-// level — уровень по порядку (с нуля), в «Проводах» растёт и после 100-го (круг); hints / spares — сколько бесплатных подсказок и запасных проводов уже взято
-const freshSave = () => ({ v: 'a', level: { a: 0, b: 0 }, best: { a: {}, b: {} }, gold: { a: {}, b: {} }, seen: {}, muted: false, unlockAll: false, hints: 0, spares: 0 });
+// level — уровень по порядку (с нуля), в «Проводах» растёт и после 100-го (круг); hints — сколько бесплатных подсказок уже взято
+const freshSave = () => ({ v: 'a', level: { a: 0, b: 0 }, best: { a: {}, b: {} }, gold: { a: {}, b: {} }, seen: {}, muted: false, unlockAll: false, hints: 0 });
 // Вариант правил: ?v=a | ?v=b в адресе (только DEV), иначе последний выбранный в меню. В сборке для стора — всегда «Провода».
 let QV = null;
 
@@ -772,7 +783,10 @@ const RC = {
   INTER_FROM: 10,         // inter_start_level — с какого уровня игра зовёт межуровневую на «Next» после победы
   INTER_ON_RETRY: true,   // inter_on_retry — межуровневая и на «Restart» из карточки «No moves left»
   HINTS_FREE: 3,          // hints_free — сколько подсказок по кнопке бесплатно (на всю игру), дальше — за ролик
-  SPARE_FREE: 2,          // spare_free — сколько запасных проводов бесплатно (на всю игру), дальше — за ролик
+  // Undo и + wire (решение Андрея 16.11: «ундо и вайр должны быть за реворд, а на уровне открытия — бесплатными с туторами»):
+  // до уровня открытия кнопки нет; на нём — бесплатно и с рукой на кнопке; со следующего — каждое нажатие за ролик.
+  UNDO_FROM: 6,           // undo_unlock_level — 6-й: первый, где новичок без отмены упирается в тупик каждый четвёртый раз (4 — 2%, 5 — 9%, 6 — 24%)
+  WIRE_FROM: 4,           // wire_unlock_level — запасной провод, как и раньше, с 4-го
   AD_MS: 1200,            // заглушка рекламы вне приложения: сколько висит экран «AD»
 };
 function readRemoteConfig(){
@@ -786,12 +800,12 @@ function readRemoteConfig(){
   RC.INTER_FROM = int('inter_start_level', RC.INTER_FROM, 1, 100000);
   RC.INTER_ON_RETRY = bool('inter_on_retry', RC.INTER_ON_RETRY);
   RC.HINTS_FREE = int('hints_free', RC.HINTS_FREE, 0, 1000);
-  RC.SPARE_FREE = int('spare_free', RC.SPARE_FREE, 0, 1000);
-  CFG.SPARE_FROM_LEVEL = int('spare_from_level', CFG.SPARE_FROM_LEVEL, 1, 100);
+  RC.UNDO_FROM = int('undo_unlock_level', RC.UNDO_FROM, 1, 100000);
+  RC.WIRE_FROM = int('wire_unlock_level', RC.WIRE_FROM, 1, 100000);
   CFG.NUDGE_IDLE_MS = int('idle_hint_ms', CFG.NUDGE_IDLE_MS, 2000, 600000);
   CFG.STAR3_K = num('star3_k', CFG.STAR3_K, 1, 5);
   CFG.STAR2_K = Math.max(CFG.STAR3_K, num('star2_k', CFG.STAR2_K, 1, 10));
-  log('event', 'config', JSON.stringify({ RC, spare_from_level: CFG.SPARE_FROM_LEVEL, idle_hint_ms: CFG.NUDGE_IDLE_MS, star3_k: CFG.STAR3_K, star2_k: CFG.STAR2_K }));
+  log('event', 'config', JSON.stringify({ RC, idle_hint_ms: CFG.NUDGE_IDLE_MS, star3_k: CFG.STAR3_K, star2_k: CFG.STAR2_K }));
 }
 
 const SPARE = -2;                                     // «контейнер»-призрак: место под запасной провод/колбу
@@ -1029,12 +1043,13 @@ function goto(screen, payload){
       <div class="row">${last && DEV ? devLastHtml() : '<button class="primary big" data-act="next">Next</button>'}</div>`;
   }
   if (screen === 'stuck'){
-    const can = G.s && G.s.spare < CFG.SPARE_PER_LEVEL;
-    card.innerHTML = `<h2>No moves left</h2><p>The bulbs have nowhere to go. Undo a move${can ? ' or add a spare ' + R.unit : ''}.</p>
-      <div class="row"><button class="primary" data-act="undo">Undo</button>${can ? `<button data-act="spare">+ ${R.unit}${spareNeedsAd() ? ' · AD' : ''}</button>` : ''}<button data-act="retry">Restart</button></div>`;
+    const can = G.s && G.s.spare < CFG.SPARE_PER_LEVEL && wireGate() !== 'locked', ug = undoGate(), cu = ug !== 'locked';
+    const how = cu && can ? 'Undo a move, add a spare ' + R.unit + ' or restart.' : cu ? 'Undo a move or restart.' : can ? 'Add a spare ' + R.unit + ' or restart.' : 'Restart the level.';
+    card.innerHTML = `<h2>No moves left</h2><p>The bulbs have nowhere to go. ${how}</p>
+      <div class="row">${cu ? `<button class="primary" data-act="undo">Undo${ug === 'ad' ? ' · AD' : ''}</button>` : ''}${can ? `<button data-act="spare">+ ${R.unit}${spareNeedsAd() ? ' · AD' : ''}</button>` : ''}<button${cu ? '' : ' class="primary"'} data-act="retry">Restart</button></div>`;
   }
   if (screen === 'ad'){
-    card.innerHTML = `<div class="adbox">AD</div><p>Ad placeholder · ${payload || ''}</p>`;
+    card.innerHTML = `<div class="adbox">AD</div><p>Ad placeholder · ${payload || ''}</p>${payload === 'interstitial' ? '' : '<button data-act="ad-close">No thanks</button>'}`;
   }
 }
 function demoWin(){ const n = G.s ? G.s.no : 0, li = G.s ? G.s.li : 0, par = levelsOf(G.v)[li].par, moves = G.s ? G.s.moves || par : par; return { n, li, moves, par, stars: starsFor(moves, par), gold: G.s && G.s.gold ? G.s.gold.st || 2 : 0 }; }
@@ -1049,7 +1064,7 @@ function mechHelp(){
 $('card').addEventListener('click', (e) => {
   const b = e.target && e.target.closest ? e.target.closest('[data-act]') : null; if (!b) return;
   const act = b.dataset.act;
-  if (G.screen === 'ad') return;
+  if (G.screen === 'ad'){ if (act === 'ad-close') adClose(); return; }
   Sound.init(); Sound.ui(); log('input', 'button', act);
   if (act === 'play'){ quitMark('levels'); startLevel(curLevel()); }
   else if (act === 'retry') interThen('retry', () => { log('event', 'level.restart', 'level=' + levelNo(G.s) + ' from=stuck'); startLevel(G.s ? G.s.no : 0); });
@@ -1079,13 +1094,24 @@ function interThen(kind, go){
   log('event', 'ad.inter', kind + ' level=' + n); showInterstitial(go);
 }
 // Заглушка: экран «AD» на RC.AD_MS (игра на паузе, звук заглушён), потом колбэк.
+// «No thanks» на ролике за награду — отказ: награды нет, игрок возвращается туда, откуда пришёл (как закрытый ролик в SayKit).
 function adStub(what, then){
-  if (G.busyAd) return; G.busyAd = true;
-  const back = G.screen === 'stuck' ? 'game' : G.screen; goto('ad', what); setPaused('ad', true); log('event', 'ad.show', what);
-  setTimeout(() => { G.busyAd = false; setPaused('ad', false); log('event', 'ad.done', what); if (G.screen === 'ad') goto(back); then(); }, RC.AD_MS);
+  if (G.busyAd) return;
+  const back = G.screen, ad = G.busyAd = { what, back, timer: 0 };
+  goto('ad', what); setPaused('ad', true); log('event', 'ad.show', what);
+  ad.timer = setTimeout(() => { if (G.busyAd !== ad) return; G.busyAd = null; setPaused('ad', false); log('event', 'ad.done', what);
+    if (G.screen === 'ad') goto(back === 'stuck' ? 'game' : back); then(); }, RC.AD_MS);
+}
+function adClose(){
+  const ad = G.busyAd; if (!ad) return; clearTimeout(ad.timer); G.busyAd = null; setPaused('ad', false);
+  log('event', 'ad.cancel', ad.what); goto(ad.back);
 }
 const hintNeedsAd = () => G.v === 'a' && G.save.hints >= RC.HINTS_FREE;
-const spareNeedsAd = () => G.v === 'a' && G.save.spares >= RC.SPARE_FREE;
+// Доступ к Undo и + wire по номеру уровня: 'locked' — кнопки нет, 'free' — уровень открытия (бесплатно, урок), 'ad' — за ролик.
+// В «Колбах» (только DEV) — как было: бесплатно.
+function gate(from, s){ s = s || G.s; if (!s || s.v !== 'a') return 'free'; const n = levelNo(s); return n < from ? 'locked' : n === from ? 'free' : 'ad'; }
+const undoGate = (s) => gate(RC.UNDO_FROM, s), wireGate = (s) => gate(RC.WIRE_FROM, s);
+const spareNeedsAd = () => wireGate() === 'ad';
 
 let toastUntil = 0;
 function toast(msg){ const t = $('toast'); t.textContent = msg; t.classList.remove('hide'); toastUntil = now() + CFG.TOAST_MS; }
@@ -1097,7 +1123,7 @@ let scale = 1, W = VW, H = 640, DPR = 1;
 const SAFE = { top: 0, bottom: 0 };                  // безопасные зоны экрана (чёлка, полоска жестов) в виртуальных юнитах — поле и итоговая гирлянда отступают на них
 const topY = () => CFG.TOP_Y + SAFE.top;             // высота подвеса итоговой гирлянды
 // Запасной контейнер на первых уровнях спрятан: на экране только то, что нужно для урока.
-const spareOpen = (s) => s.no >= CFG.SPARE_FROM_LEVEL - 1;
+const spareOpen = (s) => s.v !== 'a' ? s.no >= CFG.SPARE_FROM_LEVEL - 1 : levelNo(s) >= RC.WIRE_FROM;
 // layout(): места контейнеров. Место под запасной контейнер зарезервировано заранее (призрак) — поле не прыгает.
 function layout(){
   const s = G.s; if (!s) return;
@@ -1317,9 +1343,10 @@ function hud(){
   $('btn-mute').classList.toggle('off', !!G.save.muted);
   $('spare-label').textContent = RULES[v].unit;
   $('btn-spare').disabled = !s || s.spare >= CFG.SPARE_PER_LEVEL;
-  $('btn-spare').style.display = s && !spareOpen(s) && !s.spare ? 'none' : '';       // на первых уровнях кнопки нет вовсе — «Отмена» стоит по центру
+  $('btn-spare').style.display = s && !spareOpen(s) && !s.spare ? 'none' : '';
+  $('btn-undo').style.display = s && undoGate(s) === 'locked' ? 'none' : '';                 // до уровня открытия кнопки нет       // на первых уровнях кнопки нет вовсе — «Отмена» стоит по центру
   $('btn-undo').disabled = !s || !s.hist.length;
-  $('btn-hint').classList.toggle('adon', hintNeedsAd()); $('btn-spare').classList.toggle('adon', spareNeedsAd());   // значок AD: следующая — за ролик
+  $('btn-hint').classList.toggle('adon', hintNeedsAd()); $('btn-spare').classList.toggle('adon', spareNeedsAd()); $('btn-undo').classList.toggle('adon', undoGate(s) === 'ad');   // значок AD: следующая — за ролик
 }
 const canInput = () => G.s && G.screen === 'game' && !G.ending && now() >= G.lockUntil;
 // liftWhy: почему с провода нельзя снять лампы — 'bird' | 'ice' | 'frost' | '' (можно или провод пуст)
@@ -1633,11 +1660,52 @@ function lessonStart(){
   const keys = s.v === 'a' ? Object.keys(L.mech || {}).filter(k => MECH[k] && !learned(k)).sort((a, b) => MECH[a].order - MECH[b].order) : [];
   G.lesson = keys.length ? { keys, bump: '' } : null; G.handCache = null;
   keys.forEach((k, q) => after(CFG.SPOT_DELAY_MS + q * CFG.SPOT_MS, () => spot(k)));
-  if (GEO.ghost >= 0 && !G.save.seen.spare) after(CFG.SPOT_DELAY_MS + keys.length * CFG.SPOT_MS + 250, spareSpot);
+  const at = CFG.SPOT_DELAY_MS + keys.length * CFG.SPOT_MS + 250;
+  if (s.v === 'a' ? wireGate(s) === 'free' : GEO.ghost >= 0 && !G.save.seen.spare) after(at, spareSpot);
+  if (s.v === 'a' && undoGate(s) === 'free') after(at, undoSpot);
+  COACH.used = {}; COACH.key = ''; COACH.want = '';
 }
-// spareSpot: запасной провод появляется впервые (4-й уровень) — один раз блик по пунктиру и толчок кнопки, без текста
+// undoSpot: уровень открытия Undo (undo_unlock_level) — кнопка появляется с толчком и звоном; рука придёт, когда отмена реально нужна
+function undoSpot(){
+  if (!G.s || G.screen !== 'game') return;
+  Sound.glint(); log('fx.start', 'spot.undo');
+  const b = $('btn-undo'); b.classList.remove('pulse'); void b.offsetWidth; b.classList.add('pulse');
+  after(1700, () => { b.classList.remove('pulse'); log('fx.end', 'spot.undo'); });
+}
+// --- урок кнопки на уровне её открытия: рука на Undo или + wire в момент, когда кнопка реально полезна ---
+//   Undo — последний ход завёл в тупик (солвер: отсюда уже не собрать) или ходов нет;
+//   + wire — пустых проводов нет и осмысленных ходов осталось два и меньше (или тупик).
+// Пока игрок на этом уровне кнопкой не воспользовался; любое касание руку убирает до следующей паузы. На карточке «No moves left» —
+// рука на её кнопке. Рука — DOM (#coach) поверх кнопок и карточек, ввод не перехватывает.
+const COACH = { key: '', want: '', used: {}, shown: '' };
+function coachUsed(k){ if (G.s && G.s.v === 'a' && !COACH.used[k] && (k === 'undo' ? undoGate() : wireGate()) === 'free'){ COACH.used[k] = 1; log('event', 'lesson.learned', 'btn.' + k); } COACH.want = ''; }
+function coachWant(s){
+  const dead = () => { const h = hintMove(s); return !h.move && h.dead; };
+  if (undoGate(s) === 'free' && !COACH.used.undo && s.hist.length && (isStuck(s) || dead())) return 'undo';
+  if (wireGate(s) === 'free' && !COACH.used.wire && !s.spare && !s.tubes.some(t => !t.length) && (legalMoves(s).length <= 2 || dead())) return 'wire';
+  return '';
+}
+function coachTick(){
+  const el = $('coach'), s = G.s; let target = null;
+  if (s && s.v === 'a' && !G.paused && (G.screen === 'game' || G.screen === 'stuck') && !isWin(s) && !G.ending){
+    const key = s.moves + '|' + s.spare + '|' + s.tubes.join('|');
+    if (key !== COACH.key && V.pending === 0 && now() - G.inputT > 450){ COACH.key = key; COACH.want = coachWant(s); }
+    if (key === COACH.key && COACH.want && now() - G.inputT > 450){
+      const card = G.screen === 'stuck';
+      target = COACH.want === 'undo' ? (card ? $('card').querySelector('[data-act=undo]') : $('btn-undo')) : (card ? $('card').querySelector('[data-act=spare]') : $('btn-spare'));
+      if (target && (!target.offsetParent || target.disabled)) target = null;
+    }
+  }
+  if (!target){ if (!el.classList.contains('hide')){ el.classList.add('hide'); log('fx.end', 'coach'); COACH.shown = ''; } return; }
+  const fr = $('frame').getBoundingClientRect(), r = target.getBoundingClientRect();
+  el.classList.toggle('down', r.top + r.height * 0.5 > fr.top + fr.height * 0.72);
+  el.style.left = ((r.left + r.width * 0.5 - fr.left) / frameK).toFixed(1) + 'px'; el.style.top = ((r.top + r.height * 0.5 - fr.top) / frameK).toFixed(1) + 'px';
+  if (el.classList.contains('hide') || COACH.shown !== COACH.want + G.screen){ el.classList.remove('hide'); COACH.shown = COACH.want + G.screen; log('fx.start', 'coach', COACH.want + (G.screen === 'stuck' ? ' card' : '')); }
+}
+setInterval(coachTick, 200);
+// spareSpot: уровень открытия запасного провода (wire_unlock_level) — блик по пунктиру и толчок кнопки, без текста
 function spareSpot(){
-  if (!G.s || G.screen !== 'game' || GEO.ghost < 0 || G.save.seen.spare) return;
+  if (!G.s || G.screen !== 'game' || GEO.ghost < 0) return;
   G.save.seen.spare = 2; save(); V.spareT = now(); Sound.glint(); log('fx.start', 'spot.spare');
   const b = $('btn-spare'); b.classList.remove('pulse'); void b.offsetWidth; b.classList.add('pulse');
   after(1700, () => { b.classList.remove('pulse'); log('fx.end', 'spot.spare'); });
@@ -1707,8 +1775,11 @@ function checkStuck(){
 }
 // Отмена в любой момент, кроме победы: ядро откатывается сразу, картинка собирается заново, а лампы отменённого хода летят назад
 // с того места, где их застала отмена (в полёте, на проводе, в улетающей гирлянде, на итоговом проводе).
-function undo(){
+function undo(paid){
   if (!G.s || G.ending || now() < G.lockUntil || !G.s.hist.length) return;
+  const g = undoGate(); if (g === 'locked') return;
+  if (g === 'ad' && !paid){ adPlace = 'undo'; showRewarded(() => undo(true)); return; }   // каждое нажатие — ролик; награда только в onReward
+  coachUsed('undo');
   const L = G.lasts.pop() || null, t = now();
   let back = null;
   if (L){
@@ -1731,12 +1802,13 @@ function undo(){
     kick(L.a, 3);
   }
 }
-// Запасной провод: первые RC.SPARE_FREE на всю игру бесплатно, дальше — за ролик (showRewarded, место spare).
+// Запасной провод: до wire_unlock_level нет, на нём бесплатно (с рукой), дальше — за ролик (showRewarded, место spare).
 function useSpare(paid){
   if (!G.s || G.ending || now() < G.lockUntil) return;
   if (G.s.spare >= CFG.SPARE_PER_LEVEL){ toast(G.s.v === 'a' ? 'Spare wire already added' : 'Spare jar already added'); return; }
-  if (!paid && spareNeedsAd()){ adPlace = 'spare'; showRewarded(() => useSpare(true)); return; }
-  if (!paid && G.v === 'a'){ G.save.spares++; save(); }
+  const g = wireGate(); if (g === 'locked' && !G.s.spare) return;
+  if (g === 'ad' && !paid){ adPlace = 'spare'; showRewarded(() => useSpare(true)); return; }
+  coachUsed('wire');
   if (G.sel >= 0) select(-1, true);
   G.s = addSpare(G.s); G.lasts.push(null); V.cont.push([]); layout();
   const i = V.cont.length - 1, c = contCenter(i);
