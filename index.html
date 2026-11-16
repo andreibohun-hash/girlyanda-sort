@@ -758,7 +758,7 @@ const DEV = false;
 const TITLE = 'Twinkle Sort';                         // рабочее название (name-check 16.11: свободно в Play и App Store); финальное Андрей не выбрал — менять только здесь
 const API = TITLE.replace(/[^A-Za-z0-9]/g, '');       // window.TwinkleSort — пауза для обёртки
 const NAME = 'girlyanda-sort';                        // ключ сохранения: прогресс переживает смену названия
-const VERSION = '0.6.1';                              // видна в меню: по ней плейтестер и мы понимаем, какая сборка открыта
+const VERSION = '0.6.2';                              // видна в меню: по ней плейтестер и мы понимаем, какая сборка открыта
 const T0 = performance.now();
 let clockSkew = 0;                                    // drive() двигает игровые часы вперёд без ожидания
 let pauseAt = 0;                                      // момент паузы (фон, реклама, обёртка): пока стоит, игровые часы стоят на нём
@@ -2203,6 +2203,14 @@ function drawRays(c, t){
 }
 // drawWire: провод варианта a — от стены к свободному концу, с провисом, патронами под лампы и «током» при сборе цвета.
 // Обледеневший провод — в ледяной корке с сосульками; провод с цветным патроном — скоба, патроны и силуэты ламп в его цвете.
+// drawAdBadge: значок «за рекламу» на холсте — тот же, что .ad на кнопках (жёлтая плашка, тёмный текст, тень снизу); x, y — центр
+function drawAdBadge(c, x, y){
+  const w = 22, h = 14;
+  c.save(); c.fillStyle = '#b86e12'; c.beginPath(); c.roundRect(x - w / 2, y - h / 2 + 1.2, w, h, 5); c.fill();
+  c.fillStyle = PAL.accent; c.beginPath(); c.roundRect(x - w / 2, y - h / 2, w, h, 5); c.fill();
+  c.fillStyle = '#3a2410'; c.font = '1000 9.5px Nunito, system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('AD', x, y + 0.6);
+  c.restore();
+}
 function drawWire(c, g, t, ghost){
   const x1 = g.x0, x2 = g.x0 + g.dir * g.len, born = V.bornT[g.i] === undefined ? 1 : ease((t - V.bornT[g.i]) / dur(420));
   const xe = x1 + (x2 - x1) * born, mx = (x1 + xe) / 2, my = g.y + 2 * sagOf(g.i) * born;
@@ -2215,7 +2223,9 @@ function drawWire(c, g, t, ghost){
     if (spk > 0){ const gx = g.x0 + g.dir * g.len * sp; glow(c, PAL.warm, gx, g.y + 4, 60, 0.7 * spk); glow(c, PAL.warm, px, py, 70, 0.45 * spk); c.globalAlpha = 0.34 + 0.6 * spk; }
     c.lineWidth = 2; c.beginPath(); c.arc(px, py, 12, 0, Math.PI * 2); c.stroke();
     c.lineWidth = 2.6; c.beginPath(); c.moveTo(px - 6, py); c.lineTo(px + 6, py); c.moveTo(px, py - 6); c.lineTo(px, py + 6); c.stroke();
-    c.restore(); return;
+    c.restore();
+    if (spareNeedsAd()) drawAdBadge(c, px + 10, py - 12);   // провод за ролик — значок AD и на «+» поля (Андрей 16.11), как на кнопке «+ wire»
+    return;
   }
   const sel = G.sel === g.i, over = G.drag && G.drag.over === g.i, sockCol = G.s.sock[g.i] === undefined ? -1 : G.s.sock[g.i];
   const icy = V.iceWire === g.i ? 1 : V.iceWireT[g.i] === undefined ? 0 : 1 - clamp01((t - V.iceWireT[g.i]) / dur(CFG.THAW_MS));
