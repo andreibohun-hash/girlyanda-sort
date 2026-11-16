@@ -104,6 +104,7 @@ footer button.pulse{animation:pulse .8s ease-in-out 2}
 .lock:before{content:"";position:absolute;left:2px;top:-7px;width:8px;height:8px;border:2px solid var(--muted);border-bottom:0;border-radius:5px 5px 0 0;box-sizing:border-box}
 .ver{margin-top:8px;font-size:11px;color:var(--muted);opacity:.6;font-weight:800}
 .cheat{margin-top:8px;font-size:12px;padding:6px 10px;background:transparent;border:1.5px dashed var(--muted);color:var(--muted);border-radius:12px}
+.card button.quiet{background:transparent;border:0;box-shadow:none;color:var(--muted);font-size:14px;padding:6px 10px}
 .stars{display:flex;gap:8px;justify-content:center;margin:6px 0 12px}
 .star{width:52px;height:52px;background:#40376c;clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)}
 .star.on{background:linear-gradient(#fff2a8,#ffcf33 55%,#ff9a3c);animation:starIn .5s cubic-bezier(.2,1.6,.4,1) both;animation-delay:var(--d)}
@@ -191,7 +192,10 @@ const CFG = {
   A_BOTTOM: 74,           // вариант a: отступ поля от низа кадра (кнопки)
   A_ROW_MIN: 66, A_ROW_MAX: 104,  // высота ряда проводов
   A_WALL: 20,             // отступ первой лампы от стены
-  A_STEP: 40, A_STEP5: 33,        // шаг ламп на проводе при вместимости ≤4 и 5
+  A_STEP: 40, A_STEP5: 33,        // шаг ламп на проводе при вместимости ≤4 и 5 (при k = 1)
+  A_K_MAX: 1.6,           // вариант a: насколько крупнее лампы, когда проводов мало и место есть (16.11, Андрей: «крупнее и сочнее»)
+  A_FILL: 0.88,           // доля шага, которую занимает ширина лампы: больше — лампы касаются друг друга
+  BULB_W_K: 1.9,          // ширина спрайта лампы в радиусах (спрайт 59×96 при высоте 3,1 R)
   A_SAG: 5,               // провис провода
   A_LIFT: 14,             // на сколько приподнимаются выбранные лампы
   TOP_Y: 78,              // итоговая гирлянда сверху: высота подвеса
@@ -758,7 +762,7 @@ const DEV = false;
 const TITLE = 'Twinkle Sort';                         // рабочее название (name-check 16.11: свободно в Play и App Store); финальное Андрей не выбрал — менять только здесь
 const API = TITLE.replace(/[^A-Za-z0-9]/g, '');       // window.TwinkleSort — пауза для обёртки
 const NAME = 'girlyanda-sort';                        // ключ сохранения: прогресс переживает смену названия
-const VERSION = '0.6.2';                              // видна в меню: по ней плейтестер и мы понимаем, какая сборка открыта
+const VERSION = '0.7.0';                              // видна в паузе: по ней плейтестер и мы понимаем, какая сборка открыта
 const T0 = performance.now();
 let clockSkew = 0;                                    // drive() двигает игровые часы вперёд без ожидания
 let pauseAt = 0;                                      // момент паузы (фон, реклама, обёртка): пока стоит, игровые часы стоят на нём
@@ -1027,7 +1031,7 @@ function goto(screen, payload){
   if (screen === 'pause'){
     card.innerHTML = `<h2>Paused</h2><p>Level ${levelNo(G.s)}</p>
       <div class="col"><button class="primary big" data-act="resume">Resume</button><button data-act="restart">Restart</button>
-      <button data-act="quit">Quit level</button><button data-act="help">How to play</button></div>`;
+      <button data-act="help">How to play</button>${sdkSettings() ? '<button class="quiet" data-act="privacy">Privacy &amp; support</button>' : ''}${DEV ? '<button class="cheat" data-act="menu">Levels (dev)</button>' : ''}</div><div class="ver">v${VERSION}</div>`;
   }
   if (screen === 'help'){
     card.innerHTML = G.v === 'a'
@@ -1052,6 +1056,8 @@ function goto(screen, payload){
     card.innerHTML = `<div class="adbox">AD</div><p>Ad placeholder · ${payload || ''}</p>${payload === 'interstitial' ? '' : '<button data-act="ad-close">No thanks</button>'}`;
   }
 }
+// Экран приложения с политикой приватности, согласием и поддержкой: pfSdk.shell.settings() (есть только в обёртке) — строка в паузе.
+function sdkSettings(){ const sdk = window.pfSdk; return sdk && sdk.shell && typeof sdk.shell.settings === 'function' ? () => sdk.shell.settings() : null; }
 function demoWin(){ const n = G.s ? G.s.no : 0, li = G.s ? G.s.li : 0, par = levelsOf(G.v)[li].par, moves = G.s ? G.s.moves || par : par; return { n, li, moves, par, stars: starsFor(moves, par), gold: G.s && G.s.gold ? G.s.gold.st || 2 : 0 }; }
 // Справка по механикам: только те, что уже встречались (или все — с читом). Правило — та же строка, что в ядре (MECH.rule).
 const MECH_ICON = { frost: 'ice-cap', iceWire: 'ice-cap', dark: 'bulb-burnt', wild: 'bulb-on-pearl', sock: '', bird: 'bird-sit', gold: 'socket-gold' };
@@ -1070,15 +1076,16 @@ $('card').addEventListener('click', (e) => {
   else if (act === 'retry') interThen('retry', () => { log('event', 'level.restart', 'level=' + levelNo(G.s) + ' from=stuck'); startLevel(G.s ? G.s.no : 0); });
   else if (act === 'next'){ const n = (G.s ? G.s.no : -1) + 1; interThen('next', () => startLevel(n)); }
   else if (act === 'help'){ G.helpBack = G.screen === 'pause' ? 'pause' : 'menu'; goto('help'); }
-  else if (act === 'back') goto(G.helpBack === 'pause' && G.s ? 'pause' : 'menu');
+  else if (act === 'back') goto(G.helpBack === 'pause' && G.s ? 'pause' : G.s ? 'game' : 'menu');
+  else if (act === 'privacy'){ const f = sdkSettings(); if (f) f(); }
   else if (act === 'resume') goto('game');
   else if (act === 'restart'){ log('event', 'level.restart', 'level=' + levelNo(G.s) + ' moves=' + (G.s ? G.s.moves : 0) + ' from=pause'); startLevel(G.s ? G.s.no : curLevel()); }
-  else if (act === 'quit'){ quitMark('quit'); goto('menu'); }
   else if (act === 'lvl'){ const n = +b.dataset.li; if (isOpen(n)){ if (!G.s || G.s.no !== n) quitMark('levels'); startLevel(n); } else toast('Finish level ' + (G.save.level[G.v] + 1) + ' first'); }
   else if (act === 'undo'){ goto('game'); undo(); }
   else if (act === 'spare'){ goto('game'); useSpare(); }
   else if (DEV && devAct(act, b)){}
-  else goto('menu');
+  else if (DEV && act === 'menu') goto('menu');
+  else goto(G.s ? 'game' : 'menu');
 });
 
 // --- реклама: обёртка Proto-vibe заменяет тела showRewarded и showInterstitial настоящим SayKit; здесь — заглушка «AD» ---
@@ -1132,12 +1139,20 @@ function layout(){
   GEO.cont = []; GEO.ghost = ghost ? n : -1;
   if (s.v === 'a'){
     // провода растут от левой и правой стены в шахматном порядке, как ветки
+    // Масштаб k: мало проводов — лампы крупнее. Ограничения: провод не длиннее половины ширины (шаг ламп упирается в стену),
+    // лампа не шире A_FILL шага, ряд не выше свободной высоты / числа рядов; k от 1 до A_K_MAX.
     const rows = Math.ceil(N / 2), top = CFG.A_TOP + SAFE.top, bottom = H - CFG.A_BOTTOM - SAFE.bottom;
-    const rowH = Math.max(CFG.A_ROW_MIN, Math.min(CFG.A_ROW_MAX, (bottom - top) / (rows + 0.5)));
+    let maxCap = 0; for (let i = 0; i < N; i++) maxCap = Math.max(maxCap, capOf(i));
+    const room = W / 2 - CFG.A_WALL - 12, baseStep = (cap) => cap >= 5 ? CFG.A_STEP5 : CFG.A_STEP;
+    const stepAt = (cap, k) => Math.max(baseStep(cap), Math.min(baseStep(cap) * k, room / cap));
+    const rowFree = (bottom - top) / (rows + 0.5);
+    const kh = stepAt(maxCap, CFG.A_K_MAX) * CFG.A_FILL / (CFG.BULB_R * CFG.BULB_W_K), kv = rowFree / CFG.A_ROW_MAX;
+    const k = Math.max(1, Math.min(CFG.A_K_MAX, kh, kv));
+    const rowH = Math.max(CFG.A_ROW_MIN, Math.min(CFG.A_ROW_MAX * k, rowFree));
     const y0 = top + Math.max(0, (bottom - top - (rows + 0.5) * rowH) * 0.5);     // поле по центру свободной высоты: ближе к большому пальцу, чем к шапке
-    GEO.r = CFG.BULB_R; GEO.rowH = rowH; GEO.k = 1;
+    GEO.r = CFG.BULB_R * k; GEO.rowH = rowH; GEO.k = k;
     for (let i = 0; i < N; i++){
-      const side = i % 2, row = (i - side) / 2, cap = capOf(i), step = cap >= 5 ? CFG.A_STEP5 : CFG.A_STEP;
+      const side = i % 2, row = (i - side) / 2, cap = capOf(i), step = stepAt(cap, k);
       GEO.cont.push({ i, side, dir: side ? -1 : 1, x0: side ? W : 0, y: y0 + rowH * 0.3 + row * rowH + (side ? rowH * 0.5 : 0), cap, step, len: CFG.A_WALL + cap * step + 8 });
     }
   } else {
@@ -1156,6 +1171,7 @@ function layout(){
   }
 }
 const bulbH = () => GEO.r * CFG.BULB_H_K;
+const topScale = () => CFG.TOP_SCALE / GEO.k;                     // итоговая гирлянда сверху — того же размера при любом k
 // Пружинка: провод качается после посадки, снятия ламп и ухода гирлянды — затухающая синусоида поверх провиса (лампы висят на нём и качаются вместе).
 function sagOf(i){ const k = V.kick[i]; if (!k) return CFG.A_SAG; const tau = (now() - k.t0) / dur(CFG.KICK_MS); if (tau >= 1){ delete V.kick[i]; return CFG.A_SAG; } return CFG.A_SAG + k.amp * Math.exp(-4.5 * tau) * Math.sin(tau * 17); }
 function kick(i, amp){ if (G.s && G.s.v === 'a' && i >= 0) V.kick[i] = { t0: now(), amp: REDUCED ? 0 : amp }; }
@@ -1178,7 +1194,7 @@ function wireEnd(i){ const g = GEO.cont[i]; return g && g.dir ? { x: g.x0 + g.di
 // центр контейнера — для подсказки, хука where() и эффектов
 function contCenter(ci){
   const c = GEO.cont[ci]; if (!c) return { x: W / 2, y: H / 2 };
-  if (G.s.v === 'a') return { x: c.x0 + c.dir * c.len * 0.5, y: c.y + 16 };
+  if (G.s.v === 'a') return { x: c.x0 + c.dir * c.len * 0.5, y: c.y + 16 * GEO.k };
   return { x: c.x, y: c.yBot - c.h / 2 };
 }
 function containerAt(p){
@@ -1188,7 +1204,7 @@ function containerAt(p){
     let d;
     if (G.s.v === 'a'){
       if ((c.side === 0) !== (p.x < W / 2)) continue;
-      d = Math.abs(p.y - (c.y + 14)); if (d > GEO.rowH * 0.5) continue;
+      d = Math.abs(p.y - (c.y + 14 * GEO.k)); if (d > GEO.rowH * 0.5) continue;
     } else {
       d = Math.abs(p.x - c.x); if (d > GEO.tw / 2 + CFG.HIT_PAD + 3) continue;
       if (p.y < c.yBot - c.h - CFG.B_ROW_GAP * GEO.k * 0.9 || p.y > c.yBot + CFG.HIT_PAD) continue;
@@ -1229,7 +1245,7 @@ function syncVisual(){
   V.cont = s.tubes.map((str, i) => Array.from(str, (ch, j) => { const l = mkLamp(lampAt(str, j), i, j); if (i === s.ice) l.ice = true; return l; }));   // на обледеневшем проводе в инее все лампы
   V.top = []; V.capT = {}; V.goldT = {}; V.bornT = {}; V.gone = []; V.pending = 0; V.kick = {}; V.curT = {}; V.birdDue = 0; G.no = null; G.inputT = t;
   V.bird = s.bird >= 0 ? { at: s.bird, from: -1, t0: 0, d: 1 } : null; V.iceWire = s.ice; V.iceWireT = {}; G.spot = null; G.rays = []; G.handCache = null;
-  if (RULES[s.v].leave) s.done.forEach((col) => { const n = perOf(s, col); for (let j = 0; j < n; j++){ const l = mkLamp(col, -1, 0); l.top = V.top.length; l.lit = tw(1); l.sc = tw(CFG.TOP_SCALE); V.top.push(l); } });
+  if (RULES[s.v].leave) s.done.forEach((col) => { const n = perOf(s, col); for (let j = 0; j < n; j++){ const l = mkLamp(col, -1, 0); l.top = V.top.length; l.lit = tw(1); l.sc = tw(topScale()); V.top.push(l); } });
   else s.tubes.forEach((str, i) => { if (isComplete(str, s.per)) V.capT[i] = -1e9; });
   layout();
   for (let i = 0; i < V.cont.length; i++) relight(i, t, true);
@@ -1240,7 +1256,7 @@ function selLamps(){ if (G.sel < 0 || !V.cont[G.sel]) return []; const arr = V.c
 function lampPose(l, t){
   const base = l.top >= 0 ? topPos(l.top) : slotPos(l.ci, l.si), isA = G.s.v === 'a';
   let x = base.x, y = base.y, ang = 0, sc = twVal(l.sc, t);
-  const lift = twVal(l.lift, t), liftY = lift > 0.001 && l.top < 0 ? (isA ? CFG.A_LIFT : base.y - mouthPos(l.ci).y) * lift : 0;
+  const lift = twVal(l.lift, t), liftY = lift > 0.001 && l.top < 0 ? (isA ? CFG.A_LIFT * GEO.k : base.y - mouthPos(l.ci).y) * lift : 0;
   const dg = G.drag;
   if (dg && l.ci === G.sel && l.top < 0 && !l.grp && l.si >= V.cont[l.ci].length - G.selN){     // перетаскивание: группа веером над пальцем
     // Подхват за DRAG_GRAB_MS (от места, где лампу застало касание, — хоть в полёте), дальше лампа идёт за пальцем жёстко, в тот же кадр:
@@ -1268,7 +1284,7 @@ function lampPose(l, t){
     }
   }
   if (lift > 0.001){
-    if (isA){ y -= CFG.A_LIFT * lift - Math.sin(t / 260 + l.id) * 1.6 * lift; sc *= 1 + 0.1 * lift; }
+    if (isA){ y -= CFG.A_LIFT * GEO.k * lift - Math.sin(t / 260 + l.id) * 1.6 * lift; sc *= 1 + 0.1 * lift; }
     else if (l.top < 0){ y -= (base.y - mouthPos(l.ci).y) * lift - Math.sin(t / 260) * 1.6 * lift; }
   }
   const tau = (t - l.landT) / 1000 * G.timeScale;                          // качание после посадки
@@ -1541,7 +1557,7 @@ function leaveSeq(seq){
     arr.forEach((l, j) => {
       const p0 = lampPose(l, now()); l.top = base + j; l.ci = -1; l.grp = null; V.top.push(l);
       startFly(l, p0, j * CFG.LEAVE_STAGGER_MS, 'top', CFG.LEAVE_MS);
-      after(j * CFG.LEAVE_STAGGER_MS, () => twTo(l.sc, CFG.TOP_SCALE, now(), CFG.LEAVE_MS));
+      after(j * CFG.LEAVE_STAGGER_MS, () => twTo(l.sc, topScale(), now(), CFG.LEAVE_MS));
       l.landCb = () => { const t = now(); l.landed = true; l.landT = t; l.flashT = t; l.flashK = 0.8; l.popT = t; l.popK = 0.4; Sound.ting(j + nth); };
     });
     after((per - 1) * CFG.LEAVE_STAGGER_MS + CFG.LEAVE_MS, () => { log('fx.end', 'leave'); log('fx.end', 'complete'); topWave(); afterComplete(); });
@@ -1938,7 +1954,7 @@ $('btn-undo').onclick = () => { Sound.init(); undo(); };
 $('btn-spare').onclick = () => { Sound.init(); log('input', 'button', 'spare'); useSpare(); };
 $('btn-hint').onclick = () => { Sound.init(); Sound.ui(); showHint(); };
 $('btn-reset').onclick = () => { Sound.init(); Sound.ui(); log('input', 'button', 'reset'); if (G.s){ log('event', 'level.restart', 'level=' + levelNo(G.s) + ' moves=' + G.s.moves + ' from=hud'); startLevel(G.s.no); } };
-$('btn-menu').onclick = () => { Sound.init(); Sound.ui(); log('input', 'button', 'pause'); if (G.s && G.screen === 'game') goto('pause'); else goto('menu'); };   // кнопка в шапке — пауза: Resume, Restart, Quit level
+$('btn-menu').onclick = () => { Sound.init(); Sound.ui(); log('input', 'button', 'pause'); if (G.s && G.screen === 'game') goto('pause'); else if (G.s && G.screen === 'pause') goto('game'); };   // кнопка в шапке — пауза: Resume, Restart, How to play (меты нет — карты уровней в сборке нет)
 $('btn-mute').onclick = () => { G.save.muted = !G.save.muted; save(); hud(); Sound.init(); Sound.ui(); log('input', 'button', 'mute=' + G.save.muted); };
 
 // --- размер: resize + orientationchange + периодический пересчёт (§2) ---
@@ -2453,7 +2469,7 @@ setInterval(() => { if (performance.now() - lastFrame > 120 && !G.paused) safeRe
 document.title = TITLE;
 readRemoteConfig(); readPalette(); loadArt(); fit(); hud();
 try { if (document.fonts && document.fonts.load) document.fonts.load('800 16px Nunito'); } catch (e) {}
-if (!DEV) goto('menu');
+if (!DEV) startLevel(curLevel());   // меты нет: игра сразу открывает текущий уровень, дальше уровни идут друг за другом
 requestAnimationFrame(frame);
 log('event', 'boot', 'v' + VERSION + ' variant=' + G.v + ' levels=' + LEVELS.a.length + '+' + LEVELS.b.length);
 </script>
