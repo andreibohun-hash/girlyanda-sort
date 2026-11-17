@@ -769,7 +769,7 @@ const DEV = false;
 const TITLE = 'Twinkle Sort';                         // рабочее название (name-check 16.11: свободно в Play и App Store); финальное Андрей не выбрал — менять только здесь
 const API = TITLE.replace(/[^A-Za-z0-9]/g, '');       // window.TwinkleSort — пауза для обёртки
 const NAME = 'girlyanda-sort';                        // ключ сохранения: прогресс переживает смену названия
-const VERSION = '0.7.2';                              // видна в паузе: по ней плейтестер и мы понимаем, какая сборка открыта
+const VERSION = '0.7.3';                              // видна в паузе: по ней плейтестер и мы понимаем, какая сборка открыта
 const T0 = performance.now();
 let clockSkew = 0;                                    // drive() двигает игровые часы вперёд без ожидания
 let pauseAt = 0;                                      // момент паузы (фон, реклама, обёртка): пока стоит, игровые часы стоят на нём
@@ -987,10 +987,6 @@ const Sound = {
   gold(){ [0, 4, 7, 12, 16, 19].forEach((s, i) => this.bell(659.25 * Math.pow(2, s / 12), i * 0.07, 0.09)); [0, 7, 12].forEach(s => this.tone(329.63 * Math.pow(2, s / 12), 1200, 'triangle', 0.05, 0.1, 0, true)); this.hiss(500, 'highpass', 6500, 0.07, 0.05); log('sound', 'gold'); },
   goldLost(){ this.tone(700, 380, 'triangle', 0.08, 0, 160); this.hiss(300, 'lowpass', 1200, 0.1); log('sound', 'gold.lost'); },
   sockNo(){ this.tone(240, 120, 'triangle', 0.14, 0, 180); this.bell(this.note(2), 0.02, 0.04); log('sound', 'sock.no'); },
-  rocket(at, vol){ vol = vol || 1; this.tone(900, 420, 'sine', 0.035 * vol, at, 2600); this.hiss(420, 'highpass', 5000, 0.05 * vol, at); },   // салют: свист взлёта
-  boom(at, vol){ vol = vol || 1; this.tone(90, 260, 'sine', 0.28 * vol, at, 40); this.hiss(380, 'lowpass', 1800, 0.3 * vol, at); this.hiss(700, 'highpass', 9000, 0.07 * vol, at + 0.06); },   // хлопок и треск
-  bulbPop(at, vol, n){ vol = vol || 1; this.tone(140, 160, 'sine', 0.16 * vol, at, 70); this.hiss(60, 'bandpass', 2600, 0.22 * vol, at, 3);   // салют ламп: мягкий «чпок» и россыпь стеклянных колокольчиков
-    const base = Math.floor((at * 7) % 4); for (let i = 0; i < Math.min(5, n || 5); i++) this.bell(this.note(base + i * 2), at + 0.03 + i * 0.045, 0.045 * vol); },
   win(){ [0, 2, 4, 7, 9, 12].forEach((k, i) => this.bell(this.note(k + 1), i * 0.11, 0.09)); [0, 4, 7, 12].forEach(s => this.tone(261.63 * Math.pow(2, s / 12), 1800, 'triangle', 0.045, 0.6, 0, true)); log('sound', 'win'); },
 };
 function buzz(ms){ try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {} }
@@ -1017,7 +1013,7 @@ function goto(screen, payload){
   G.screen = screen; log('screen', screen, G.v);
   const ov = $('overlay'), card = $('card');
   card.className = 'card'; ov.classList.remove('night');
-  if (screen !== 'win' && screen !== 'fireworks' && SKY.on){ SKY.on = false; SKY.rockets = []; if (SKY.cv) SKY.cv.getContext('2d').clearRect(0, 0, SKY.cv.width, SKY.cv.height); }   // реклама, следующий уровень — небо чистое сразу
+  if (screen !== 'win' && screen !== 'fireworks' && SKY.on){ SKY.on = false; if (SKY.cv) SKY.cv.getContext('2d').clearRect(0, 0, SKY.cv.width, SKY.cv.height); }   // реклама, следующий уровень — небо чистое сразу
   if (screen === 'game'){ ov.classList.remove('show'); hud(); return; }
   ov.classList.add('show');
   const R = RULES[G.v], LV = levelsOf(G.v), cur = curLevel();
@@ -1053,7 +1049,7 @@ function goto(screen, payload){
       : `<h2>Jars</h2><ul class="how"><li>Tap a jar — the <b>top bulb</b> lifts up.</li><li>Tap another jar — the bulb drops in if the jar is empty or its top bulb is <b>the same color</b>.</li>
          <li>All bulbs of a color in one jar — it <b>lights up and closes</b>.</li><li>Stuck? Use Undo or a spare jar.</li></ul><button class="primary" data-act="back">Got it</button>`;
   }
-  if (screen === 'fireworks'){ ov.classList.add('night'); card.className = 'card sky'; card.innerHTML = `<div class="logo">${TITLE}</div>`; return; }   // фаза салюта: только название, тап — к карточке
+  if (screen === 'fireworks'){ ov.classList.add('night'); card.className = 'card sky'; card.innerHTML = ''; return; }   // фаза ламп: карточки нет, тап — к карточке
   if (screen === 'win'){
     if (SKY.on) ov.classList.add('night');                // карточка — на том же ночном небе, салют за ней тише
     const p = payload || demoWin(), last = G.v === 'b' && p.n >= LV.length - 1;
@@ -1613,118 +1609,82 @@ function finishWin(){
   log('event', 'reward', 'stars=' + stars + (gold ? ' gold=' + (gold === 1 ? 'got' : 'lost') : ''));
   skyWin({ n, li, moves: s.moves, par, stars, gold });
 }
-// ---------- Победа салютом (17.11, Андрей: «как у половинок, только с нашим попапом поверх») ----------
-// Фаза 1 (SKY_MS): оверлей — ночное небо, на холсте #sky ракеты с хвостами взлетают снизу и рвутся шарами искр
-// (цвета собранных гирлянд, золото, белый), сверху падают блёстки, по центру — название игры. Тап после SKY_SKIP_MS — сразу к карточке.
-// Фаза 2: карточка победы поверх, салют реже и тише за ней. Всё — от абсолютного времени now(), на паузе стоит.
-const SKY = { on: false, t0: 0, card: 0, rockets: [], next: 0, cv: null, w: 390, h: 800, dirty: false, win: null, cols: [], ci: [] };
-const backOut = (u) => { const k = 1.9; u = Math.max(0, Math.min(1, u)) - 1; return 1 + (k + 1) * u * u * u + k * u * u; };   // пружинка с перелётом
-const SKY_MS = 1300, SKY_SKIP_MS = 300, SKY_GOLD = ['#ffd35a', '#ffffff', '#fff0a8'];
+// ---------- Победа: лампы в темноте (17.11, Андрей: «на фоне в темноте очень красиво загораются и тухнут разного цвета лампы, потом попап») ----------
+// Фаза 1 (SKY_MS): оверлей — ночная темнота, по всему экрану висят тёмные лампы (силуэты стекла); они по одной загораются разными
+// цветами — щелчок, вспышка, большое мягкое свечение — держат свет и медленно гаснут, потом снова. Сзади дышат размытые пятна света.
+// Тап после SKY_SKIP_MS — сразу к карточке. Фаза 2: карточка победы поверх, лампы за ней продолжают тише.
+// Всё — функции абсолютного времени now() и сида (§4): на паузе стоит, кадр не копит состояние.
+const SKY = { on: false, t0: 0, card: 0, cv: null, w: 390, h: 800, dirty: false, win: null, lamps: [], bokeh: [], rang: {} };
+const SKY_MS = 1700, SKY_SKIP_MS = 300;
 function skyCanvas(){
   if (SKY.cv) return SKY.cv;
   const c = document.createElement('canvas'); c.id = 'sky'; $('overlay').insertBefore(c, $('card'));
   $('overlay').addEventListener('pointerdown', () => { if (G.screen === 'fireworks' && now() - SKY.t0 > SKY_SKIP_MS){ log('input', 'skip', 'fireworks'); skyCard(); } });
   return SKY.cv = c;
 }
-function skyRocket(t, soft){                        // «ракета»-лампа: взлетает снизу огоньком своего цвета и рвётся веером ламп; всё — заранее по сиду
-  const q = mulberry32(Math.round(t * 7) % 100000 + 11), w = SKY.w, h = SKY.h, cs = SKY.ci.length ? SKY.ci : [3];
-  const ci = cs[Math.floor(q() * cs.length)], col = colorHex(ci) || '#ffd35a';
-  const r = { t0: t, fly: 560 + q() * 240, x0: w * (0.14 + q() * 0.72), x1: 0, y1: h * (soft ? (q() < 0.6 ? 0.08 + q() * 0.1 : 0.8 + q() * 0.08) : 0.14 + q() * 0.24),
-    ci, col, n: soft ? 7 : 9 + Math.floor(q() * 4), R: (soft ? 60 : 88) + q() * 36, rot: q() * Math.PI * 2, life: 1500 + q() * 500, soft, seed: Math.floor(q() * 1e6) };
-  r.x1 = r.x0 + (q() - 0.5) * w * 0.12;
-  SKY.rockets.push(r);
-  const d = Math.max(0, (t - now()) / 1000); Sound.rocket(d, soft ? 0.35 : 0.8); Sound.bulbPop(d + r.fly / 1000, soft ? 0.4 : 1, r.n);
+// Лампы: сетка с разбросом, глубина z (дальние мельче и тусклее); у каждой свой цикл «загорелась — держит — гаснет — темно».
+// Первые загорания — плотно в первые ~1,3 с (видно сразу), цвета — собранные на уровне и остальные палитры.
+function skyLamps(seed){
+  const q = mulberry32(seed), cols = 6, rows = 10, lamps = [], used = (G.s ? G.s.done : []).filter(k => k < 6), pal = [0, 1, 2, 3, 4].concat(used, used);
+  for (let r = 0; r < rows; r++) for (let k = 0; k < cols; k++){
+    if (q() < 0.3) continue;                                   // пустоты — не ровная сетка
+    const z = 0.55 + q() * 0.65;
+    lamps.push({ x: (k + 0.25 + q() * 0.5) / cols, y: (r + 0.2 + q() * 0.6) / rows, z, ci: pal[Math.floor(q() * pal.length)], tilt: (q() - 0.5) * 0.5,
+      first: 80 + q() * 1250, up: 140 + q() * 80, hold: 500 + q() * 900, down: 700 + q() * 700, gap: 500 + q() * 1800, sw: q() * 6.28, id: lamps.length });
+  }
+  lamps.sort((a, b) => a.z - b.z);                             // дальние рисуются первыми
+  return lamps;
+}
+// lampLight(L, u): яркость лампы 0…1 и момент последнего загорания (для щелчка-вспышки) — чистая функция времени от старта
+function lampLight(L, u){
+  const d = u - L.first; if (d < 0) return { b: 0, k: -1, since: 1e9 };
+  const P = L.up + L.hold + L.down + L.gap, k = Math.floor(d / P), ph = d - k * P;
+  let b = 0;
+  if (ph < L.up) b = 1 - Math.pow(1 - ph / L.up, 3);
+  else if (ph < L.up + L.hold) b = 0.92 + 0.08 * Math.sin((ph - L.up) / 90 + L.sw);
+  else if (ph < L.up + L.hold + L.down) b = Math.pow(1 - (ph - L.up - L.hold) / L.down, 1.6) * 0.92;
+  return { b, k, since: ph };
 }
 function skyWin(payload){
-  const t = now(), c = skyCanvas(); SKY.win = payload; SKY.ci = G.s ? G.s.done.slice() : []; SKY.cols = SKY.ci.map(colorHex);
+  const t = now(); skyCanvas(); SKY.win = payload;
   goto('fireworks');
-  SKY.on = true; SKY.t0 = t; SKY.card = 0; SKY.rockets = [];
-  const r = c.getBoundingClientRect(); SKY.w = r.width || 390; SKY.h = r.height || 800;
-  const n = REDUCED ? 3 : 7, span = REDUCED ? 500 : 900;
-  for (let k = 0; k < n; k++) skyRocket(k < 3 ? t - 560 + k * 170 : t + 120 + (k - 3) * span / (n - 3), false);   // первые три уже в небе — взрываются сразу
-  SKY.next = t + 80 + span + 300;
-  buzz([20, 40, 20]); log('fx.start', 'fireworks', 'rockets=' + n);
+  SKY.on = true; SKY.t0 = t; SKY.card = 0; SKY.rang = {};
+  SKY.lamps = skyLamps(((G.s ? G.s.no : 0) * 7919 + 17) >>> 0);
+  const q = mulberry32(4242); SKY.bokeh = []; for (let i = 0; i < 9; i++) SKY.bokeh.push({ x: q(), y: q(), r: 120 + q() * 160, ci: Math.floor(q() * 5), ph: q() * 6.28, sp: 1800 + q() * 1600 });
+  buzz([20, 40, 20]); log('fx.start', 'fireworks', 'lamps=' + SKY.lamps.length);
 }
 function skyCard(){ if (G.screen !== 'fireworks') return; log('fx.end', 'fireworks'); SKY.card = now(); goto('win', SKY.win); }
 function drawSky(){
   if (!SKY.cv) return;
-  if (!SKY.on){ if (SKY.dirty){ SKY.cv.getContext('2d').clearRect(0, 0, SKY.cv.width, SKY.cv.height); SKY.dirty = false; SKY.rockets = []; } return; }
+  if (!SKY.on){ if (SKY.dirty){ SKY.cv.getContext('2d').clearRect(0, 0, SKY.cv.width, SKY.cv.height); SKY.dirty = false; } return; }
   SKY.dirty = true;
-  const cvs = SKY.cv, r = cvs.getBoundingClientRect(), d = Math.min(window.devicePixelRatio || 1, 2), t = now();
+  const cvs = SKY.cv, r = cvs.getBoundingClientRect(), d = Math.min(window.devicePixelRatio || 1, 2), t = now(), u = t - SKY.t0;
   const cw = Math.round(r.width * d), ch = Math.round(r.height * d);
   if (cvs.width !== cw || cvs.height !== ch){ cvs.width = cw; cvs.height = ch; }
-  SKY.w = r.width; SKY.h = r.height;
-  const c = cvs.getContext('2d'); c.setTransform(d, 0, 0, d, 0, 0); c.clearRect(0, 0, r.width, r.height);
-  if (G.screen === 'fireworks' && t - SKY.t0 >= (REDUCED ? 800 : SKY_MS)) skyCard();
-  if (G.screen === 'win' && !REDUCED && t >= SKY.next){ skyRocket(t, true); SKY.next = t + 430 + (t % 260); }   // за карточкой — мягче и реже
-  const K = 0.0028, Gv = 0.00012, soft = G.screen === 'win';
-  SKY.rockets = SKY.rockets.filter(k => t < k.t0 + k.fly + k.life);
-  skyGarland(c, t, soft);
-  const BH = 40, BW = BH * 0.61;                     // размер ламп салюта (спрайт 59×96)
-  for (const k of SKY.rockets){
-    const dt = t - k.t0; if (dt < 0) continue;
-    const on = spr('bulb-on-' + COLOR_NAMES[k.ci]);
-    if (dt < k.fly){                                // взлёт: лампа носиком вверх, за ней светящийся хвост её цвета
-      const pos = (u) => { u = Math.max(0, Math.min(1, u)); const e = 1 - (1 - u) * (1 - u); return [k.x0 + (k.x1 - k.x0) * e, SKY.h + 10 + (k.y1 - SKY.h - 10) * e]; };
-      const a = pos(dt / k.fly), b = pos((dt - 160) / k.fly);
-      c.save(); c.globalCompositeOperation = 'lighter'; c.lineCap = 'round';
-      const g = c.createLinearGradient(b[0], b[1], a[0], a[1]); g.addColorStop(0, k.col + '00'); g.addColorStop(1, k.col + 'cc');
-      c.strokeStyle = g; c.lineWidth = 3; c.beginPath(); c.moveTo(b[0], b[1]); c.lineTo(a[0], a[1]); c.stroke(); c.restore();
-      glow(c, k.col, a[0], a[1], 34, 0.7);
-      if (on){ const hh = BH * 0.6, ww = hh * on.width / on.height; c.save(); c.translate(a[0], a[1]); c.rotate(Math.PI); c.drawImage(on, -ww / 2, -hh * 0.5, ww, hh); c.restore(); }
-      continue;
-    }
-    const bt = dt - k.fly, life = k.life, fade = Math.max(0, Math.min(1, (life - bt) / (life * 0.35))), al = (k.soft ? 0.8 : 1) * (soft && !k.soft ? 0.85 : 1);
-    if (bt < 220 && !REDUCED){ glow(c, '#ffffff', k.x1, k.y1, 150 * (0.5 + bt / 220), (1 - bt / 220) * 0.75 * al); }   // щелчок: белая вспышка
-    if (bt < 700){                                  // кольцо света её цвета расходится от центра
-      const u = bt / 700; c.save(); c.globalCompositeOperation = 'lighter'; c.globalAlpha = (1 - u) * 0.55 * al; c.strokeStyle = k.col; c.lineWidth = 3 * (1 - u) + 1;
-      c.beginPath(); c.arc(k.x1, k.y1, k.R * (0.3 + 1.2 * (1 - Math.pow(1 - u, 3))), 0, Math.PI * 2); c.stroke(); c.restore();
-      glow(c, k.col, k.x1, k.y1, 120 + bt * 0.1, (1 - u) * 0.45 * al);
-    }
-    const rnd = mulberry32(k.seed), out = 1 - Math.exp(-bt / 210);
-    for (let i = 0; i < k.n; i++){                  // веер ламп: разлетаются от центра цоколем к центру, пружинят, светят и мигают
-      const ang = k.rot + (i / k.n) * Math.PI * 2 + (rnd() - 0.5) * 0.25, rr = k.R * (0.82 + rnd() * 0.3), ph = rnd() * 6.28;
-      const drop = 0.000022 * bt * bt, x = k.x1 + Math.cos(ang) * rr * out, y = k.y1 + Math.sin(ang) * rr * out + drop;
-      const pop = bt < 260 ? backOut(bt / 260) : 1, sc = (k.soft ? 0.78 : 1) * pop * (0.85 + 0.15 * fade);
-      const tw = bt > life * 0.45 ? 0.55 + 0.45 * Math.sin(bt / 70 + ph) : 1;   // к концу лампы мерцают, как гирлянда
-      const a = fade * al * tw; if (a <= 0.01) continue;
-      glow(c, k.col, x, y, 46 * sc, a * 0.85);
-      if (on){ const hh = BH * sc, ww = BW * sc; c.save(); c.globalAlpha = Math.min(1, a * 1.1); c.translate(x, y); c.rotate(ang - Math.PI / 2); c.drawImage(on, -ww / 2, -hh * 0.45, ww, hh); c.restore(); }
-      if (bt < 380 && !REDUCED){                    // блик-крестик на стекле в момент вспышки
-        const v = Math.sin(Math.min(1, bt / 380) * Math.PI), z = 7 * v * sc;
-        c.save(); c.globalCompositeOperation = 'lighter'; c.globalAlpha = 0.9 * v * al; c.strokeStyle = '#ffffff'; c.lineWidth = 1.6; c.lineCap = 'round';
-        const bx = x + Math.cos(ang) * hh0(sc), by = y + Math.sin(ang) * hh0(sc);
-        c.beginPath(); c.moveTo(bx - z, by); c.lineTo(bx + z, by); c.moveTo(bx, by - z); c.lineTo(bx, by + z); c.stroke(); c.restore();
-      }
-    }
+  const w = SKY.w = r.width, h = SKY.h = r.height;
+  const c = cvs.getContext('2d'); c.setTransform(d, 0, 0, d, 0, 0); c.clearRect(0, 0, w, h);
+  if (G.screen === 'fireworks' && u >= (REDUCED ? 900 : SKY_MS)) skyCard();
+  const soft = G.screen === 'win', dim = soft ? 0.7 : 1, intro = Math.min(1, u / 350);
+  for (const B of SKY.bokeh){                                  // размытые пятна света в глубине — медленно дышат
+    const a = (0.06 + 0.05 * Math.sin(u / B.sp + B.ph)) * intro * dim;
+    glow(c, colorHex(B.ci), B.x * w, B.y * h, B.r * 2, a);
   }
-  c.globalAlpha = 1;
-  if (!REDUCED){                                     // огоньки сверху: медленно падают, качаются и мерцают (позиции — от сида и времени)
-    const u = t - SKY.t0, n = soft ? 26 : 60, cs = SKY.cols.length ? SKY.cols : SKY_GOLD;
-    for (let i = 0; i < n; i++){
-      const q = mulberry32(900 + i), x = q() * SKY.w + Math.sin(u / 700 + i) * 10, sp = 0.03 + q() * 0.045, y = ((q() * SKY.h * 0.6 + sp * u) % (SKY.h + 20)) - 10;
-      glow(c, i % 3 === 0 ? '#ffd35a' : cs[i % cs.length], x, y, 12 + 4 * q(), (soft ? 0.5 : 0.9) * (0.55 + 0.45 * Math.sin(u / 120 + i * 1.7)));
-    }
-    c.globalAlpha = 1;
-  }
-}
-const hh0 = (sc) => 40 * sc * 0.3;                 // от подвеса до середины стекла лампы салюта
-// skyGarland: гирлянда через всё небо сверху — лампы цветов уровня зажигаются бегущей волной, потом перемигиваются
-function skyGarland(c, t, soft){
-  const w = SKY.w, y0 = Math.max(26, SKY.h * 0.07), sag = 26, M = Math.max(9, Math.round(w / 34)), cs = SKY.ci.length ? SKY.ci : [3], u = t - SKY.t0;
-  const yAt = (x) => { const v = x / w; return y0 + 4 * sag * v * (1 - v); };
-  c.save(); c.strokeStyle = '#2f6b49'; c.lineWidth = 2.2; c.globalAlpha = soft ? 0.6 : 0.9; c.beginPath();
-  for (let k = 0; k <= 24; k++){ const x = -8 + (w + 16) * k / 24; k ? c.lineTo(x, yAt(x)) : c.moveTo(x, yAt(x)); } c.stroke(); c.restore();
-  for (let q = 0; q < M; q++){
-    const x = (q + 0.5) * w / M, y = yAt(x), ci = cs[q % cs.length], col = colorHex(ci), on = spr('bulb-on-' + COLOR_NAMES[ci]), off = spr('bulb-off-' + COLOR_NAMES[ci]);
-    const lt = u - 120 - q * 55, lit = REDUCED ? 1 : lt <= 0 ? 0 : Math.min(1, lt / 120), chase = lt > 600 ? 0.6 + 0.4 * Math.sin(u / 160 - q * 0.9) : 1;
-    const hh = 24, ww = hh * 0.61, a = (soft ? 0.75 : 1) * lit * chase, ang = Math.atan2(4 * sag * (1 - 2 * x / w) / w, 1) * 0.6;
-    if (a > 0.01) glow(c, col, x, y + hh * 0.5, 44, a * 0.8);
-    c.save(); c.translate(x, y); c.rotate(ang);
-    if (off){ c.globalAlpha = soft ? 0.7 : 1; c.drawImage(off, -ww / 2, -hh * 0.12, ww, hh); }
-    if (on && a > 0.01){ c.globalAlpha = Math.min(1, a); c.drawImage(on, -ww / 2, -hh * 0.12, ww, hh); }
+  const BH = Math.min(w / 6.2, 64);                            // высота ближней лампы
+  for (const L of SKY.lamps){
+    const x = L.x * w, y = L.y * h, hh = BH * L.z, ww = hh * 0.61, col = colorHex(L.ci), name = COLOR_NAMES[L.ci];
+    const on = spr('bulb-on-' + name), off = spr('bulb-off-' + name), lt = REDUCED ? { b: 0.8, k: 0, since: 1e9 } : lampLight(L, u);
+    const b = lt.b * dim, far = 0.45 + 0.55 * (L.z - 0.55) / 0.65;                 // дальние тусклее
+    const pop = lt.since < 260 ? 1 + 0.1 * Math.sin(lt.since / 260 * Math.PI) : 1;   // щелчок: лампа чуть подпрыгивает масштабом
+    const sway = L.tilt + Math.sin(u / 900 + L.sw) * 0.04;
+    if (b > 0.01){ glow(c, col, x, y + hh * 0.35, hh * 3.4, b * 0.55 * far); glow(c, col, x, y + hh * 0.35, hh * 1.5, b * 0.8 * far); }
+    if (lt.since < 200 && !REDUCED) glow(c, '#ffffff', x, y + hh * 0.35, hh * 2.2, (1 - lt.since / 200) * 0.7 * far * dim);   // белая вспышка загорания
+    c.save(); c.translate(x, y); c.rotate(sway); c.scale(pop, pop);
+    if (off){ c.globalAlpha = (0.07 + 0.09 * far) * intro * dim; c.drawImage(off, -ww / 2, -hh * 0.12, ww, hh); }   // в темноте — силуэт стекла
+    if (on && b > 0.01){ c.globalAlpha = Math.min(1, b * (0.55 + 0.45 * far)); c.drawImage(on, -ww / 2, -hh * 0.12, ww, hh); }
     c.restore();
-    if (lt > 0 && lt < 160 && !REDUCED) glow(c, '#ffffff', x, y + hh * 0.5, 40, (1 - lt / 160) * 0.8);   // щелчок загорания
+    if (G.screen === 'fireworks' && lt.k >= 0 && lt.since < 120 && !SKY.rang[L.id + ':' + lt.k]){   // звук: тихий колокольчик на загорание (только в первой фазе)
+      SKY.rang[L.id + ':' + lt.k] = 1; if (Object.keys(SKY.rang).length <= 18) Sound.bell(Sound.note(L.ci + Math.floor(L.y * 4)), 0, 0.02 + 0.02 * L.z);
+    }
   }
   c.globalAlpha = 1;
 }
