@@ -25,6 +25,12 @@
   --wire:#2a5a40; --wire-hi:#6fae82; --wire-gold:#ffd772; --socket:#3b4258;
   --glass:#aebcff; --glass-fill:#141a33;
   --card1:#241d44; --card2:#131029;
+  /* объёмные кнопки (аудит UI 17.11): цвет по смыслу — зелёная «хорошее и спасительное», красная «сброс», нейтральная — остальное.
+     top/bot — градиент лица, edge — «толщина» под кнопкой, на неё кнопка проседает при нажатии */
+  --g-top:#8be86a; --g-bot:#34b33a; --g-edge:#1c7330; --g-ink:#ffffff;
+  --r-top:#ff8a7a; --r-bot:#e8424a; --r-edge:#97202d; --r-ink:#ffffff;
+  --n-top:#4c4794; --n-bot:#352f74; --n-edge:#1a163f; --n-ink:#fff8ec;
+  --btn-edge:5px;                            /* высота «толщины» кнопки, px */
   --frame-w:440px;                           /* расчётная ширина кадра (CFG.FRAME_W) */
   --fk:1;                                    /* масштаб кадра: fitFrame() растягивает его на высоком портретном окне шире расчётного */
 }
@@ -38,31 +44,41 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:16px/1
 #frame{position:relative;width:min(100vw,var(--frame-w));height:100vh;height:calc(100dvh / var(--fk));height:calc(100svh / var(--fk));margin:0 auto;background:var(--frame);overflow:hidden;
   transform-origin:50% 0;--sat:calc(env(safe-area-inset-top, 0px) / var(--fk));--sab:calc(env(safe-area-inset-bottom, 0px) / var(--fk))}
 #frame.zoom{transform:scale(var(--fk))}
-#frame.narrow header{gap:5px;padding-left:8px;padding-right:8px} #frame.narrow header .pill{padding:6px 10px;font-size:13.5px} #frame.narrow .ib{width:36px;height:36px} #frame.narrow .ib svg{width:20px;height:20px} #frame.narrow #hud-moves .lbl{display:none}
+#frame.narrow header{gap:4px;padding-left:8px;padding-right:8px} #frame.narrow header .hl,#frame.narrow header .hr{gap:6px} #frame.narrow header .pill{padding:6px 13px 7px;font-size:16px}
 #sa{position:absolute;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;padding-top:var(--sat);padding-bottom:var(--sab)}
 #game{position:absolute;inset:0;touch-action:none;-webkit-touch-callout:none}
 #game canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
-header{position:absolute;left:0;right:0;top:0;display:flex;align-items:center;gap:7px;padding:calc(8px + var(--sat)) 10px 0;pointer-events:none;z-index:3}
-header .pill{background:rgba(16,18,40,.7);border:1.5px solid rgba(255,255,255,.14);border-radius:999px;padding:6px 13px;font-weight:900;font-size:15px;letter-spacing:.01em;white-space:nowrap}
-header .pill.dim{color:var(--muted);font-weight:800}
-header .sp{flex:1}
-.ib{pointer-events:auto;width:40px;height:40px;border-radius:50%;padding:0;display:grid;place-items:center;background:rgba(16,18,40,.7);border:1.5px solid rgba(255,255,255,.16)}
-.ib svg{width:22px;height:22px;fill:none;stroke:var(--ink);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+/* Шапка (аудит UI 17.11): слева тихие пауза и звук, по центру номер уровня, справа подсказка (зелёная) и рестарт (красный).
+   Счётчик ходов скрыт: без звёзд и рекорда цифра без подписи ничего не значит (элемент остался — журнал и стенды). */
+header{position:absolute;left:0;right:0;top:0;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:6px;padding:calc(8px + var(--sat)) 10px 0;pointer-events:none;z-index:3}
+header .hl,header .hr{display:flex;gap:8px;align-items:center} header .hr{justify-content:flex-end}
+header .pill{background:rgba(16,18,40,.72);border:1.5px solid rgba(255,214,120,.28);border-radius:999px;padding:6px 16px 7px;font-weight:1000;font-size:17px;letter-spacing:.01em;white-space:nowrap;box-shadow:0 3px 0 rgba(0,0,0,.35)}
+#hud-moves{display:none}
+/* Объёмная кнопка: лицо — градиент, под ним «толщина» --btn-edge; при нажатии (класс .down с касания или :active) проседает на неё.
+   Цвет — по смыслу: .go зелёная (Next, Resume, Undo, + wire, подсказка, Got it), .stop красная (Restart), без класса — нейтральная. */
+button{font:inherit;font-weight:1000;color:var(--n-ink);border:0;border-radius:16px;padding:11px 18px;cursor:pointer;position:relative;
+  --t:var(--n-top);--b:var(--n-bot);--e:var(--n-edge);
+  background:linear-gradient(var(--t),var(--b));box-shadow:0 var(--btn-edge) 0 var(--e),0 calc(var(--btn-edge) + 5px) 12px rgba(0,0,0,.38),inset 0 2px 0 rgba(255,255,255,.28);
+  transition:transform .06s,box-shadow .06s;margin-bottom:var(--btn-edge)}
+button.go{--t:var(--g-top);--b:var(--g-bot);--e:var(--g-edge);color:var(--g-ink);text-shadow:0 2px 0 rgba(10,70,25,.45)}
+button.stop{--t:var(--r-top);--b:var(--r-bot);--e:var(--r-edge);color:var(--r-ink);text-shadow:0 2px 0 rgba(110,15,25,.45)}
+button:active,button.down{transform:translateY(calc(var(--btn-edge) - 1px));box-shadow:0 1px 0 var(--e),0 2px 4px rgba(0,0,0,.3),inset 0 2px 0 rgba(255,255,255,.2)}
+button[disabled]{--t:#3a3a55;--b:#2c2c44;--e:#17172a;color:rgba(255,248,236,.42);text-shadow:none;cursor:default}
+button[disabled]:active,button[disabled].down{transform:none;box-shadow:0 var(--btn-edge) 0 var(--e)}
+button[disabled] svg{stroke:rgba(255,248,236,.42)!important} button[disabled] .ad{display:none!important}
+button.big{font-size:21px;padding:14px 34px;border-radius:20px}
+.ib{pointer-events:auto;width:44px;height:44px;border-radius:50%;padding:0;display:grid;place-items:center;--btn-edge:4px}
+.ib svg{width:22px;height:22px;fill:none;stroke:var(--ink);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+.ib.go{width:48px;height:48px} .ib.go svg{width:25px;height:25px;stroke:#fff;filter:drop-shadow(0 1.5px 0 rgba(10,70,25,.5))}
+.ib.stop svg{stroke:#fff;filter:drop-shadow(0 1.5px 0 rgba(110,15,25,.5))}
 .ib.off .wave{display:none} .ib:not(.off) .mutex{display:none}
-.ib:active{transform:scale(.92)}
-footer{position:absolute;left:0;right:0;bottom:0;display:flex;gap:10px;justify-content:center;padding:0 12px calc(12px + var(--sab));pointer-events:none;z-index:3}
-footer button{pointer-events:auto;background:rgba(22,24,52,.86);border:1.5px solid rgba(255,255,255,.16);border-radius:999px;padding:10px 18px;font-size:15px;display:flex;align-items:center;gap:7px}
-footer button svg{width:18px;height:18px;fill:none;stroke:var(--ink);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
-footer button[disabled]{opacity:.35}
-footer button:active{transform:scale(.95)}
-button{font:inherit;font-weight:900;color:var(--ink);background:#2f2859;border:0;border-radius:16px;padding:11px 18px;cursor:pointer}
-button.primary{background:linear-gradient(#ffe066,#ffb22e);color:var(--ink-dark);box-shadow:0 4px 0 #b86e12, 0 8px 18px rgba(255,170,40,.35)}
-button.primary:active{transform:translateY(3px);box-shadow:0 1px 0 #b86e12}
-button.big{font-size:20px;padding:14px 34px;border-radius:20px}
+footer{position:absolute;left:0;right:0;bottom:0;display:flex;gap:12px;justify-content:center;padding:0 12px calc(8px + var(--sab));pointer-events:none;z-index:3}
+footer button{pointer-events:auto;border-radius:20px;padding:0 22px;height:54px;font-size:19px;display:flex;align-items:center;gap:8px;min-width:136px;justify-content:center}
+footer button svg{width:22px;height:22px;fill:none;stroke:#fff;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 1.5px 0 rgba(10,70,25,.5))}
 #overlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 40%,rgba(8,8,24,.3),rgba(2,2,10,.8));padding:22px;z-index:5}
 #overlay.show{display:flex}
-.card{background:linear-gradient(var(--card1),var(--card2));border:2px solid rgba(255,214,120,.32);border-radius:26px;padding:22px 20px;max-width:340px;width:100%;text-align:center;
-  box-shadow:0 0 0 6px rgba(255,214,120,.05),0 20px 50px rgba(0,0,0,.55);animation:pop .28s cubic-bezier(.2,1.4,.4,1);max-height:100%;overflow-y:auto} /* стартует с видимого состояния (§9) */
+.card{background:linear-gradient(#33296a,#1d1745);border:3.5px solid #f5b53a;border-radius:28px;padding:20px 20px 16px;max-width:340px;width:100%;text-align:center;
+  box-shadow:inset 0 0 0 2px rgba(255,236,170,.25),0 0 0 4px rgba(20,12,4,.45),0 20px 50px rgba(0,0,0,.55);animation:pop .28s cubic-bezier(.2,1.4,.4,1);max-height:100%;overflow-y:auto} /* стартует с видимого состояния (§9) */
 @keyframes pop{from{transform:scale(.9)}to{transform:scale(1)}}
 /* победа салютом (17.11, как вин-скрин «Половинок»): ночное небо в оверлее, ракеты на холсте #sky под карточкой; сначала название игры, потом наша карточка */
 #sky{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none;z-index:0}
@@ -71,18 +87,31 @@ button.big{font-size:20px;padding:14px 34px;border-radius:20px}
 .card.sky{background:none;border:0;box-shadow:none;padding:0;animation:skyLogo .5s cubic-bezier(.25,1.6,.5,1) both;pointer-events:none}
 .card.sky .logo{font-size:58px;line-height:1}
 @keyframes skyLogo{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
-.card h2{margin:0 0 6px;font-size:27px;font-weight:1000;color:var(--accent);text-shadow:0 2px 0 #6b3a08}
-.card p{color:var(--muted);margin:0 0 14px;font-weight:700}
+.card h2{margin:0 0 4px;font-size:32px;line-height:1.08;font-weight:1000;color:#ffd84a;text-shadow:0 3px 0 #7a3b06,0 0 2px #7a3b06;letter-spacing:.005em}
+.card p{color:#e3def5;margin:0 0 14px;font-weight:800;font-size:16.5px}
+.card .col button{width:100%;display:flex;align-items:center;justify-content:center;gap:9px}
+.card button svg{width:22px;height:22px;flex:0 0 22px;fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.card button.go svg{filter:drop-shadow(0 1.5px 0 rgba(10,70,25,.45))} .card button.stop svg{filter:drop-shadow(0 1.5px 0 rgba(110,15,25,.45))}
+.card button.quiet,.card button.cheat{box-shadow:none;margin-bottom:0;background:transparent;transform:none}
+.card button.quiet{color:var(--muted);font-size:14px;padding:6px 10px;text-decoration:underline;text-underline-offset:3px}
+/* вин-карточка (аудит UI 17.11): без звёзд и счёта — заголовок, похвала, гирлянда собранных цветов загорается по одной */
+.card .praise{font-size:21px;color:#fff;font-weight:1000;margin:0 0 4px}
+.wl{position:relative;height:74px;margin:2px -6px 12px}
+.wl svg.wire{position:absolute;left:0;top:0;width:100%;height:40px;overflow:visible}
+.wl i{position:absolute;width:30px;height:46px;margin-left:-15px;background-size:contain;background-repeat:no-repeat;background-position:50% 0;transform-origin:50% 0;
+  filter:brightness(.5) saturate(.55);animation:wlOn .5s cubic-bezier(.3,1.6,.5,1) var(--d) forwards,wlTw 2.6s ease-in-out calc(var(--d) + .6s) infinite}
+@keyframes wlOn{0%{filter:brightness(.5) saturate(.55);transform:rotate(var(--r)) scale(.9)}55%{filter:brightness(1.7) saturate(1.1) drop-shadow(0 0 12px var(--c));transform:rotate(var(--r)) scale(1.12)}100%{filter:brightness(1.05) drop-shadow(0 0 8px var(--c));transform:rotate(var(--r)) scale(1)}}
+@keyframes wlTw{0%,100%{filter:brightness(1.05) drop-shadow(0 0 8px var(--c))}50%{filter:brightness(1.3) drop-shadow(0 0 14px var(--c))}}
 .logo{font-size:38px;font-weight:1000;line-height:1.02;margin:2px 0 4px;background:linear-gradient(90deg,#ff4f5e,#ffcf33,#57d977,#3fb8ff,#b77bff);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 3px 0 rgba(0,0,0,.45))}
 .sub{font-size:15px;color:var(--muted);margin:0 0 12px;font-weight:800;letter-spacing:.02em}
 .card .row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
 /* переключатель вариантов A/B */
 .seg{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:#17132f;border-radius:18px;padding:5px;margin:0 0 14px}
-.seg button{padding:9px 4px 8px;border-radius:14px;background:transparent;color:var(--muted);font-size:15px;line-height:1.15}
+.seg button{box-shadow:none;margin-bottom:0;padding:9px 4px 8px;border-radius:14px;background:transparent;color:var(--muted);font-size:15px;line-height:1.15}
 .seg button small{display:block;font-size:11px;font-weight:800;opacity:.85}
 .seg button.on{background:#3a2f6c;color:var(--ink);box-shadow:inset 0 0 0 2px rgba(255,214,120,.45)}
 .levels{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin:14px 0 4px}
-.levels button{padding:8px 0 6px;font-size:17px;border-radius:14px;background:#3a2f6c;display:flex;flex-direction:column;align-items:center;line-height:1.1;min-height:44px;justify-content:center}
+.levels button{margin-bottom:0;--btn-edge:3px;padding:8px 0 6px;font-size:17px;border-radius:14px;background:#3a2f6c;display:flex;flex-direction:column;align-items:center;line-height:1.1;min-height:44px;justify-content:center}
 .levels button small{font-size:10px;line-height:10px;height:10px;display:block}
 .dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--accent);margin:0 1px}
 .levels button.locked{opacity:.32}
@@ -96,22 +125,25 @@ button.big{font-size:20px;padding:14px 34px;border-radius:20px}
 .goldrow.total{margin:8px 0 2px;font-size:14px} .goldrow.total img{width:20px;height:20px}
 .cheat.sure{border-style:solid;border-color:var(--danger);color:var(--danger)}
 /* лампочка-подсказка мигает, когда игрок давно не ходил; толчок кнопки запасного провода при первом показе. Обе анимации стартуют с видимого состояния (§9) */
-.ib.nudge{animation:nudge 1.5s ease-in-out infinite} .ib.nudge svg{stroke:var(--accent)}
-@keyframes nudge{0%,100%{box-shadow:0 0 0 0 rgba(255,207,51,0)}50%{box-shadow:0 0 0 6px rgba(255,207,51,.3)}}
+/* кольцо вокруг кнопки — отдельным слоем, чтобы не сбивать «толщину» кнопки (box-shadow) */
+.ib.nudge{animation:nudge 1.5s ease-in-out infinite}
+.ib.nudge:before,footer button.pulse:before{content:"";position:absolute;inset:-6px;border-radius:inherit;border:3px solid rgba(255,241,160,.9);pointer-events:none;animation:ring 1.5s ease-out infinite}
+footer button.pulse:before{animation:ring .8s ease-out 2 forwards}   /* forwards: после двух вспышек кольцо остаётся невидимым, а не повисает рамкой */
+@keyframes nudge{0%,100%{scale:1}50%{scale:1.08}}
+@keyframes ring{0%{transform:scale(.9);opacity:.9}100%{transform:scale(1.3);opacity:0}}
 footer button.pulse{animation:pulse .8s ease-in-out 2}
-@keyframes pulse{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(255,241,194,0)}50%{transform:scale(1.09);box-shadow:0 0 0 7px rgba(255,241,194,.28)}}
+.ib.stop.arm{scale:1.18;transition:scale .12s} .ib.stop.arm:before{content:"";position:absolute;inset:-6px;border-radius:50%;border:3px solid rgba(255,140,130,.95);pointer-events:none;animation:ring .7s ease-out infinite}
+@keyframes pulse{0%,100%{scale:1}50%{scale:1.09}}
 .goldrow{display:flex;align-items:center;justify-content:center;gap:8px;margin:-4px 0 12px;color:var(--gold);font-weight:900}
-.goldrow img{width:24px;height:24px;object-fit:contain}
+.goldrow img{width:30px;height:30px;object-fit:contain} .card.win .goldrow{font-size:17px;margin:0 0 14px}
 .goldrow.miss{color:var(--muted)} .goldrow.miss img{filter:grayscale(1);opacity:.55}
-.how.mech{list-style:none;padding-left:0;font-size:14px} .how.mech li{display:flex;gap:8px;align-items:flex-start;margin:7px 0}
-.how.mech img,.how.mech i{flex:0 0 24px;width:24px;height:24px;object-fit:contain;margin-top:1px}
-.how.mech i{border-radius:7px;background:linear-gradient(#ff4f5e,#b77bff);box-shadow:inset 0 0 0 2px rgba(255,255,255,.35)}
+.how.mech{font-size:14px;border-top:1.5px solid rgba(255,255,255,.1);padding-top:6px} .how.mech li{margin:8px 0}
+.how.mech img,.how.mech svg{flex:0 0 26px;width:26px;height:26px;object-fit:contain;margin-top:-1px}
 /* замок — CSS-формой, не глифом (глиф вне шрифта = кадр 1 с) */
 .lock{width:12px;height:10px;border-radius:2px;background:var(--muted);position:relative;margin-top:7px}
 .lock:before{content:"";position:absolute;left:2px;top:-7px;width:8px;height:8px;border:2px solid var(--muted);border-bottom:0;border-radius:5px 5px 0 0;box-sizing:border-box}
 .ver{margin-top:8px;font-size:11px;color:var(--muted);opacity:.6;font-weight:800}
-.cheat{margin-top:8px;font-size:12px;padding:6px 10px;background:transparent;border:1.5px dashed var(--muted);color:var(--muted);border-radius:12px}
-.card button.quiet{background:transparent;border:0;box-shadow:none;color:var(--muted);font-size:14px;padding:6px 10px}
+.cheat{margin-top:8px;font-size:12px;padding:6px 10px;background:transparent;border:1.5px dashed var(--muted);color:var(--muted);border-radius:12px;box-shadow:none}
 .stars{display:flex;gap:8px;justify-content:center;margin:6px 0 12px}
 .star{width:52px;height:52px;background:#40376c;clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)}
 .star.on{background:linear-gradient(#fff2a8,#ffcf33 55%,#ff9a3c);animation:starIn .5s cubic-bezier(.2,1.6,.4,1) both;animation-delay:var(--d)}
@@ -119,13 +151,19 @@ footer button.pulse{animation:pulse .8s ease-in-out 2}
 @keyframes starIn{from{transform:scale(1.6) rotate(-20deg)}to{transform:scale(1)}}
 .stars .star.on:nth-child(2){animation-name:starIn2}
 @keyframes starIn2{from{transform:translateY(-8px) scale(1.6) rotate(-20deg)}to{transform:translateY(-8px) scale(1)}}
-.how{text-align:left;color:var(--muted);margin:0 0 16px;padding-left:20px;font-weight:700} .how li{margin:6px 0} .how b{color:var(--ink)}
+.how{text-align:left;color:#d9d4ee;margin:0 0 12px;padding-left:0;list-style:none;font-weight:700;font-size:15px;line-height:1.28} .how li{margin:7px 0;display:flex;gap:9px;align-items:flex-start} .how b{color:var(--ink)}
+.how .n{flex:0 0 24px;height:24px;border-radius:50%;background:linear-gradient(var(--g-top),var(--g-bot));color:#fff;font-weight:1000;font-size:14px;display:grid;place-items:center;box-shadow:0 2px 0 var(--g-edge)}
+.card.help{display:flex;flex-direction:column;padding-bottom:12px} .card.help .hb{overflow-y:auto;min-height:0;flex:1 1 auto;margin:0 -8px;padding:0 8px;overscroll-behavior:contain}
+.card.help > button{flex:0 0 auto;margin-top:8px}
 #toast{position:absolute;left:50%;top:calc(60px + var(--sat));transform:translateX(-50%);background:rgba(255,248,230,.96);color:var(--ink-dark);padding:9px 16px;border-radius:14px;
   pointer-events:none;opacity:.98;transition:opacity .25s;white-space:nowrap;z-index:4;font-weight:900;font-size:14px}
 #toast.hide{opacity:0}
 /* значок «за рекламу» на кнопке: следующая подсказка или запасной провод — за ролик (showRewarded) */
-.ad{display:none;position:absolute;right:-5px;top:-5px;font-style:normal;font-size:9.5px;font-weight:1000;line-height:1;padding:3px 4px 2px;border-radius:6px;background:var(--accent);color:var(--ink-dark);box-shadow:0 1px 0 #b86e12;pointer-events:none}
-.ib,footer button{position:relative} .ib.adon .ad,footer button.adon .ad{display:block}
+.ad{display:none;position:absolute;right:-7px;top:-9px;width:26px;height:21px;border-radius:7px;background:#fff;box-shadow:0 2px 0 rgba(0,0,0,.35),0 0 0 2px rgba(10,12,30,.5);pointer-events:none}
+.ad:after{content:"";position:absolute;left:10px;top:5.5px;border-style:solid;border-width:5px 0 5px 8px;border-color:transparent transparent transparent #17142e}
+.card button .ad{position:static;display:none;margin-left:auto} .card button.adon .ad{display:inline-block;flex:0 0 26px;position:relative;right:auto;top:auto}
+.ib.adon .ad,footer button.adon .ad{display:block}
+.ib .ad{right:-9px;top:-7px}
 /* карта уровней: 100 кнопок — прокрутка внутри карточки, текущий уровень виден сразу */
 .lvwrap{max-height:min(44vh,300px);overflow-y:auto;margin:10px -4px 2px;padding:6px 4px 2px;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 .lvwrap .levels{margin:0}
@@ -140,8 +178,10 @@ footer button.pulse{animation:pulse .8s ease-in-out 2}
 @keyframes coachTapDown{0%,100%{transform:translate(-5px,-12px) rotate(157deg)}45%{transform:translate(0,-2px) rotate(157deg) scale(.93)}}
 @keyframes coachRing{0%,40%{transform:scale(.4);opacity:0}50%{opacity:1}100%{transform:scale(1.15);opacity:0}}
 @media (prefers-reduced-motion: reduce){ #coach,#coach:before{animation:none} }
+.adbar{height:8px;border-radius:4px;background:rgba(255,255,255,.12);margin:-4px 18px 16px;overflow:hidden} .adbar i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#ffe066,#ffb22e);transform-origin:0 50%;animation:adbar linear both}
+@keyframes adbar{from{transform:scaleX(.04)}to{transform:scaleX(1)}}
 .adbox{margin:8px auto 14px;width:150px;height:96px;border-radius:18px;display:grid;place-items:center;font-size:34px;font-weight:1000;color:var(--ink-dark);background:linear-gradient(#ffe066,#ffb22e)}
-@media (prefers-reduced-motion: reduce){ .card,.star.on,.ib.nudge,footer button.pulse{animation:none} .ib.nudge{box-shadow:0 0 0 4px rgba(255,207,51,.3)} #toast{transition:none} }
+@media (prefers-reduced-motion: reduce){ .card,.ib.nudge,footer button.pulse,.ib.nudge:before,footer button.pulse:before,.wl i{animation:none} #toast{transition:none} }
 </style>
 </head>
 <body>
@@ -149,15 +189,13 @@ footer button.pulse{animation:pulse .8s ease-in-out 2}
   <i id="sa"></i>
   <div id="game"><canvas id="cv"></canvas></div>
   <header>
-    <span class="pill" id="hud-level">Level 1</span><span class="pill dim" id="hud-moves"><span class="lbl">moves </span><span id="hud-moves-n">0</span></span><span class="sp"></span>
-    <button class="ib" id="btn-hint" aria-label="hint"><svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z"/></svg><i class="ad">AD</i></button>
-    <button class="ib" id="btn-reset" aria-label="restart"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4.5h4.5"/></svg></button>
-    <button class="ib" id="btn-mute" aria-label="sound"><svg viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="wave" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/><path class="mutex" d="M16 9.5l5 5M21 9.5l-5 5"/></svg></button>
-    <button class="ib" id="btn-menu" aria-label="pause"><svg viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h14"/></svg></button>
+    <div class="hl"><button class="ib" id="btn-menu" aria-label="pause"><svg viewBox="0 0 24 24"><path d="M9 6v12M15 6v12"/></svg></button><button class="ib" id="btn-mute" aria-label="sound"><svg viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="wave" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/><path class="mutex" d="M16 9.5l5 5M21 9.5l-5 5"/></svg></button></div>
+    <span class="pill" id="hud-level">Level 1</span><span class="pill" id="hud-moves"><span class="lbl">moves </span><span id="hud-moves-n">0</span></span>
+    <div class="hr"><button class="ib stop" id="btn-reset" aria-label="restart"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4.5h4.5"/></svg></button><button class="ib go" id="btn-hint" aria-label="hint"><svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z"/></svg><i class="ad"></i></button></div>
   </header>
   <footer>
-    <button id="btn-undo"><svg viewBox="0 0 24 24"><path d="M9 7L4 12l5 5M4 12h10a6 6 0 0 1 0 12"/></svg>Undo<i class="ad">AD</i></button>
-    <button id="btn-spare"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span id="spare-label">wire</span><i class="ad">AD</i></button>
+    <button class="go" id="btn-undo"><svg viewBox="0 0 24 24"><path d="M9 6L4 11l5 5"/><path d="M4 11h10a6 6 0 0 1 0 12h-2"/></svg>Undo<i class="ad"></i></button>
+    <button class="go" id="btn-spare"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span id="spare-label">Wire</span><i class="ad"></i></button>
   </footer>
   <div id="overlay"><div class="card" id="card"></div></div>
   <div id="toast" class="hide"></div>
@@ -208,6 +246,8 @@ const CFG = {
   TOP_Y: 78,              // итоговая гирлянда сверху: высота подвеса
   TOP_SAG: 16,            // её провис
   TOP_SCALE: 0.56,        // масштаб ламп на итоговой гирлянде
+  TOP_SOCKET: '#56607f',  // цвет пустого патрона итоговой гирлянды (прогресс уровня)
+  GHOST_A: 0.5,           // яркость пунктирного места запасного провода (было 0.34 — почти не видно)
   B_TOP: 112, B_BOTTOM: 78,       // вариант b: поле
   B_TUBE_W: 40,           // внутренняя ширина колбы
   B_SLOT: 37,             // шаг ламп в колбе по высоте
@@ -262,6 +302,8 @@ const CFG = {
   SHAKE_MS: 300,          // тряска кадра на аккорде собранной гирлянды
   NUDGE_IDLE_MS: 9000,    // через сколько без ввода начинает мигать лампочка-подсказка в шапке (руки без урока нет)
   TOAST_MS: 1700,         // сколько висит тост
+  BTN_BUZZ_MS: 12,        // вибрация на нажатие любой кнопки (касание), мс
+  RESET_ARM_MS: 2600,     // рестарт в шапке — в два касания: первое «взводит» кнопку на столько мс, второе сбрасывает уровень
   // --- механики: вид и тайминги ---
   FROST_A: 0.62,           // плотность инея поверх лампы; середина стекла у корки почти чистая (frostSprite), цвет под ней читается
   ICE_CAP_W: 2.55,        // ширина снежной шапки с сосульками, в радиусах лампы
@@ -769,7 +811,7 @@ const DEV = false;
 const TITLE = 'Twinkle Sort';                         // рабочее название (name-check 16.11: свободно в Play и App Store); финальное Андрей не выбрал — менять только здесь
 const API = TITLE.replace(/[^A-Za-z0-9]/g, '');       // window.TwinkleSort — пауза для обёртки
 const NAME = 'girlyanda-sort';                        // ключ сохранения: прогресс переживает смену названия
-const VERSION = '0.7.3';                              // видна в паузе: по ней плейтестер и мы понимаем, какая сборка открыта
+const VERSION = '0.8.0';                              // видна в паузе: по ней плейтестер и мы понимаем, какая сборка открыта
 const T0 = performance.now();
 let clockSkew = 0;                                    // drive() двигает игровые часы вперёд без ожидания
 let pauseAt = 0;                                      // момент паузы (фон, реклама, обёртка): пока стоит, игровые часы стоят на нём
@@ -993,6 +1035,27 @@ function buzz(ms){ try { if (navigator.vibrate) navigator.vibrate(ms); } catch (
 
 // --- экраны: DOM-оверлеи, любой открывается кодом или хешем (§6, §11) ---
 const $ = (id) => document.getElementById(id);
+// Иконки кнопок карточек (контур, цвет — от текста кнопки) и значок ролика (за награду).
+const ICON = {
+  undo: '<svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>',
+  plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
+  restart: '<svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4.5h4.5"/></svg>',
+  play: '<svg viewBox="0 0 24 24"><path d="M8 5.5v13l10-6.5z" fill="currentColor"/></svg>',
+  next: '<svg viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6"/></svg>',
+  socket: '<svg viewBox="0 0 26 26"><path d="M1 6.5Q13 9 25 6.5" stroke="#6fae82" stroke-width="2.4" fill="none" stroke-linecap="round"/><rect x="9" y="7" width="8" height="6" rx="2" fill="#57d977"/><path d="M13 13c-4.6 0-5.8 4.4-3.6 8.6 1.1 2.1 6.1 2.1 7.2 0 2.2-4.2 1-8.6-3.6-8.6z" fill="none" stroke="#57d977" stroke-width="1.8" opacity=".75"/></svg>',
+};
+const AD_BADGE = '<i class="ad"></i>';
+// Похвала на вин-карточке — по номеру уровня, без случайности (§5)
+const PRAISE = ['Well done!', 'Great job!', 'Brilliant!', 'Nice work!', 'Superb!'];
+// winLights: гирлянда цветов, собранных на уровне (порядок сбора), — главный «праздник» карточки вместо звёзд
+function winLights(){
+  const cols = []; for (const l of V.top) if (!cols.includes(l.col) && l.col < COLOR_NAMES.length) cols.push(l.col);
+  if (!cols.length) for (let c = 0; c < (G.s ? G.s.colors : 5); c++) cols.push(c);
+  const n = cols.length, W0 = 100, sag = 22;          // провод — квадратичная кривая (0,5)–(50,5+sag)–(100,5) в единицах svg; высота svg 40 px = 40 единиц
+  const bulbs = cols.map((c, k) => { const x = 10 + (k + 0.5) / n * 80, t = x / 100, y = 5 + 2 * t * (1 - t) * sag, r = (t - 0.5) * -12;
+    return `<i style="left:${x}%;top:${(y - 7).toFixed(1)}px;--r:${r.toFixed(1)}deg;--d:${(0.15 + k * 0.13).toFixed(2)}s;--c:${colorHex(c)};background-image:url('${artSrc('bulb-on-' + COLOR_NAMES[c])}')"></i>`; }).join('');
+  return `<div class="wl"><svg class="wire" viewBox="0 0 ${W0} 40" preserveAspectRatio="none"><path d="M0 5 Q50 ${5 + sag} 100 5" stroke="#2a5a40" stroke-width="3" fill="none" vector-effect="non-scaling-stroke"/><path d="M0 4.3 Q50 ${4.3 + sag} 100 4.3" stroke="#6fae82" stroke-width="1.2" fill="none" vector-effect="non-scaling-stroke"/></svg>${bulbs}</div>`;
+}
 const starsHtml = (n) => '<div class="stars">' + [0, 1, 2].map(k => '<i class="star' + (k < n ? ' on' : '') + '" style="--d:' + (k * 0.18) + 's"></i>').join('') + '</div>';
 const levelsOf = (v) => LEVELS[v];
 // Линейка: в «Проводах» номер уровня не кончается — после 100-го круг с RC.LOOP_FROM (loopIndex в ядре), в «Колбах» — 10 уровней.
@@ -1029,7 +1092,7 @@ function goto(screen, payload){
     const goldRow = goldAll && isOpen(goldFrom) ? `<div class="goldrow total"><img src="${artSrc('spark-gold')}" alt="">Gold bulbs: ${goldN} of ${goldAll}</div>` : '';   // куда складывается награда золотой
     card.innerHTML = `<div class="logo">${TITLE}</div><div class="sub">sort the bulbs, light the garlands</div>
       ${DEV ? devVariantHtml() : ''}
-      <button class="primary big" data-act="play">Play · ${cur + 1}</button>
+      <button class="go big" data-act="play">Play · ${cur + 1}</button>
       <div class="lvwrap" id="lvwrap"><div class="levels${LV.length > 10 ? ' many' : ''}">${lv}</div></div>${goldRow}
       <div class="row"><button data-act="help">How to play</button></div>
       ${DEV ? devToolsHtml() : ''}<div class="ver">v${VERSION}</div>`;
@@ -1039,32 +1102,37 @@ function goto(screen, payload){
   }
   if (screen === 'pause'){
     card.innerHTML = `<h2>Paused</h2><p>Level ${levelNo(G.s)}</p>
-      <div class="col"><button class="primary big" data-act="resume">Resume</button><button data-act="restart">Restart</button>
+      <div class="col"><button class="go big" data-act="resume">${ICON.play}Resume</button><button class="stop" data-act="restart">${ICON.restart}Restart</button>
       <button data-act="help">How to play</button>${sdkSettings() ? '<button class="quiet" data-act="privacy">Privacy &amp; support</button>' : ''}${DEV ? '<button class="cheat" data-act="menu">Levels (dev)</button>' : ''}</div><div class="ver">v${VERSION}</div>`;
   }
-  if (screen === 'help'){
+  if (screen === 'help'){                                 // шаги с номерами; механики — строкой с иконкой; прокручивается середина, «Got it» всегда видна
+    card.className = 'card help';
+    const step = (n, html) => `<li><span class="n">${n}</span><span>${html}</span></li>`;
     card.innerHTML = G.v === 'a'
-      ? `<h2>How to play</h2><ul class="how"><li>Tap a wire — the <b>end bulbs of one color</b> lift up.</li><li>Tap another wire — they fly over if it is empty or its end bulb is <b>the same color</b>.</li>
-         <li>All bulbs of a color on one wire — the garland <b>lights up and flies</b> to the top.</li><li>Stuck? Use Undo or a spare wire.</li></ul>${mechHelp()}<button class="primary" data-act="back">Got it</button>`
-      : `<h2>Jars</h2><ul class="how"><li>Tap a jar — the <b>top bulb</b> lifts up.</li><li>Tap another jar — the bulb drops in if the jar is empty or its top bulb is <b>the same color</b>.</li>
-         <li>All bulbs of a color in one jar — it <b>lights up and closes</b>.</li><li>Stuck? Use Undo or a spare jar.</li></ul><button class="primary" data-act="back">Got it</button>`;
+      ? `<h2>How to play</h2><div class="hb"><ul class="how">${step(1, 'Tap a wire — its <b>end bulbs of one color</b> lift up.')}${step(2, 'Tap another wire — they fly over if it is empty or ends with <b>the same color</b>.')}
+         ${step(3, 'All bulbs of a color on one wire <b>light up</b> and fly to the top.')}${step(4, 'Stuck? <b>Undo</b> a move or add a <b>wire</b>.')}</ul>${mechHelp()}</div><button class="go big" data-act="back">Got it</button>`
+      : `<h2>Jars</h2><div class="hb"><ul class="how">${step(1, 'Tap a jar — the <b>top bulb</b> lifts up.')}${step(2, 'Tap another jar — the bulb drops in if the jar is empty or its top bulb is <b>the same color</b>.')}
+         ${step(3, 'All bulbs of a color in one jar <b>light up</b> and close.')}${step(4, 'Stuck? Use Undo or a spare jar.')}</ul></div><button class="go big" data-act="back">Got it</button>`;
   }
   if (screen === 'fireworks'){ ov.classList.add('night'); card.className = 'card sky'; card.innerHTML = ''; return; }   // фаза ламп: карточки нет, тап — к карточке
   if (screen === 'win'){
     if (SKY.on) ov.classList.add('night');                // карточка — на том же ночном небе, салют за ней тише
     const p = payload || demoWin(), last = G.v === 'b' && p.n >= LV.length - 1;
     const goldRow = p.gold ? `<div class="goldrow${p.gold === 1 ? '' : ' miss'}"><img src="${artSrc('socket-gold')}" alt="">${p.gold === 1 ? 'Gold bulb collected!' : 'The gold bulb went out'}</div>` : '';
-    card.innerHTML = `<h2>${G.v === 'a' ? 'All lit up!' : 'All jars glow!'}</h2>${starsHtml(p.stars)}${goldRow}<p>Moves ${p.moves} · best ${p.par}</p>
-      <div class="row">${last && DEV ? devLastHtml() : '<button class="primary big" data-act="next">Next</button>'}</div>`;
+    // без звёзд и счёта ходов (правило Андрея): заголовок, похвала, гирлянда собранных цветов, золотая лампа — если была, зелёный Next
+    card.className = 'card win';
+    card.innerHTML = `<h2>${G.v === 'a' ? 'All lit up!' : 'All jars glow!'}</h2><p class="praise">${PRAISE[(p.n || 0) % PRAISE.length]}</p>${winLights()}${goldRow}
+      <div class="col">${last && DEV ? devLastHtml() : `<button class="go big" data-act="next">Next${ICON.next}</button>`}</div>`;
   }
   if (screen === 'stuck'){
     const can = G.s && G.s.spare < CFG.SPARE_PER_LEVEL && wireGate() !== 'locked', ug = undoGate(), cu = ug !== 'locked';
-    const how = cu && can ? 'Undo a move, add a spare ' + R.unit + ' or restart.' : cu ? 'Undo a move or restart.' : can ? 'Add a spare ' + R.unit + ' or restart.' : 'Restart the level.';
-    card.innerHTML = `<h2>No moves left</h2><p>The bulbs have nowhere to go. ${how}</p>
-      <div class="row">${cu ? `<button class="primary" data-act="undo">Undo${ug === 'ad' ? ' · AD' : ''}</button>` : ''}${can ? `<button data-act="spare">+ ${R.unit}${spareNeedsAd() ? ' · AD' : ''}</button>` : ''}<button${cu ? '' : ' class="primary"'} data-act="retry">Restart</button></div>`;
+    // спасительное — зелёным (значок ролика, если за награду), Restart — красным и последним
+    const unit = R.unit[0].toUpperCase() + R.unit.slice(1), how = cu && can ? 'Undo a move or add a ' + R.unit + '.' : cu ? 'Undo a move.' : can ? 'Add a ' + R.unit + '.' : 'Start the level again.';
+    card.innerHTML = `<h2>No moves left</h2><p>${how}</p>
+      <div class="col">${cu ? `<button class="go big${ug === 'ad' ? ' adon' : ''}" data-act="undo">${ICON.undo}Undo${AD_BADGE}</button>` : ''}${can ? `<button class="go big${spareNeedsAd() ? ' adon' : ''}" data-act="spare">${ICON.plus}${unit}${AD_BADGE}</button>` : ''}<button class="stop${cu || can ? '' : ' big'}" data-act="retry">${ICON.restart}Restart</button></div>`;
   }
   if (screen === 'ad'){
-    card.innerHTML = `<div class="adbox">AD</div><p>Ad placeholder · ${payload || ''}</p>${payload === 'interstitial' ? '' : '<button data-act="ad-close">No thanks</button>'}`;
+    card.innerHTML = `<div class="adbox">AD</div><p>Ad playing…</p><div class="adbar"><i style="animation-duration:${RC.AD_MS}ms"></i></div>${payload === 'interstitial' ? '' : '<div class="col"><button data-act="ad-close">No thanks</button></div>'}`;
   }
 }
 // Экран приложения с политикой приватности, согласием и поддержкой: pfSdk.shell.settings() (есть только в обёртке) — строка в паузе.
@@ -1076,12 +1144,12 @@ function mechHelp(){
   const upTo = DEV && G.save.unlockAll ? 1e9 : Math.max(G.save.level.a, G.s && G.s.v === 'a' ? G.s.no : 0) + 1;
   const ks = LEVELS.a.filter(L => L.intro && L.n <= upTo).map(L => L.intro);
   if (!ks.length) return '';
-  return '<ul class="how mech">' + ks.map(k => '<li>' + (MECH_ICON[k] ? '<img src="' + artSrc(MECH_ICON[k]) + '" alt="">' : '<i></i>') + '<span><b>' + MECH[k].title + '.</b> ' + MECH[k].rule + '</span></li>').join('') + '</ul>';
+  return '<ul class="how mech">' + ks.map(k => '<li>' + (MECH_ICON[k] ? '<img src="' + artSrc(MECH_ICON[k]) + '" alt="">' : ICON.socket) + '<span><b>' + MECH[k].title + '.</b> ' + MECH[k].rule + '</span></li>').join('') + '</ul>';
 }
 $('card').addEventListener('click', (e) => {
   const b = e.target && e.target.closest ? e.target.closest('[data-act]') : null; if (!b) return;
   const act = b.dataset.act;
-  if (G.screen === 'ad'){ if (act === 'ad-close') adClose(); return; }
+  if (G.screen === 'ad'){ if (act === 'ad-close'){ Sound.init(); Sound.ui(); adClose(); } return; }
   Sound.init(); Sound.ui(); log('input', 'button', act);
   if (act === 'play'){ quitMark('levels'); startLevel(curLevel()); }
   else if (act === 'retry') interThen('retry', () => { log('event', 'level.restart', 'level=' + levelNo(G.s) + ' from=stuck'); startLevel(G.s ? G.s.no : 0); });
@@ -1368,7 +1436,9 @@ function hud(){
   $('hud-level').textContent = v === 'a' ? 'Level ' + (s ? levelNo(s) : curLevel(v) + 1) : RULES[v].title + ' · ' + ((s ? s.no : curLevel(v)) + 1) + '/' + lvTotal(v);
   $('hud-moves-n').textContent = s ? s.moves : 0;
   $('btn-mute').classList.toggle('off', !!G.save.muted);
-  $('spare-label').textContent = RULES[v].unit;
+  $('btn-reset').disabled = !s || (!s.moves && !s.spare && !s.hist.length);
+  if ($('btn-reset').disabled){ resetArmT = 0; $('btn-reset').classList.remove('arm'); }
+  $('spare-label').textContent = RULES[v].unit[0].toUpperCase() + RULES[v].unit.slice(1);
   $('btn-spare').disabled = !s || s.spare >= CFG.SPARE_PER_LEVEL;
   $('btn-spare').style.display = s && !spareOpen(s) && !s.spare ? 'none' : '';
   $('btn-undo').style.display = s && undoGate(s) === 'locked' ? 'none' : '';                 // до уровня открытия кнопки нет       // на первых уровнях кнопки нет вовсе — «Отмена» стоит по центру
@@ -2042,10 +2112,20 @@ cv.addEventListener('pointerup', onUp); cv.addEventListener('pointercancel', onU
 // iOS и встроенные браузеры (Slack, Telegram): без этого долгое касание зовёт лупу и выделение, а протяжку может забрать система — касание срывается
 for (const tn of ['touchstart', 'touchmove']) $('game').addEventListener(tn, (e) => { if (e.cancelable) e.preventDefault(); }, { passive: false });
 $('game').addEventListener('contextmenu', (e) => e.preventDefault());
-$('btn-undo').onclick = () => { Sound.init(); undo(); };
-$('btn-spare').onclick = () => { Sound.init(); log('input', 'button', 'spare'); useSpare(); };
+$('btn-undo').onclick = () => { Sound.init(); Sound.ui(); undo(); };
+$('btn-spare').onclick = () => { Sound.init(); Sound.ui(); log('input', 'button', 'spare'); useSpare(); };
 $('btn-hint').onclick = () => { Sound.init(); Sound.ui(); showHint(); };
-$('btn-reset').onclick = () => { Sound.init(); Sound.ui(); log('input', 'button', 'reset'); if (G.s){ log('event', 'level.restart', 'level=' + levelNo(G.s) + ' moves=' + G.s.moves + ' from=hud'); startLevel(G.s.no); } };
+// Рестарт в шапке стоит рядом с подсказкой: одно касание его только «взводит» (кнопка растёт, кольцо), второе за RESET_ARM_MS — сбрасывает уровень.
+// Пока сбрасывать нечего (ходов и запасного провода не было), кнопка выключена.
+var resetArmT = 0;   // var: hud() читает его и до этой строки
+$('btn-reset').onclick = () => { Sound.init(); Sound.ui(); log('input', 'button', 'reset');
+  const b = $('btn-reset'); if (!G.s || b.disabled) return;
+  if (now() > resetArmT){ resetArmT = now() + CFG.RESET_ARM_MS; b.classList.add('arm'); log('event', 'reset.arm'); setTimeout(() => { if (now() > resetArmT - 30) b.classList.remove('arm'); }, CFG.RESET_ARM_MS); return; }
+  resetArmT = 0; b.classList.remove('arm'); log('event', 'level.restart', 'level=' + levelNo(G.s) + ' moves=' + G.s.moves + ' from=hud'); startLevel(G.s.no); };
+// Нажатие любой кнопки: проседает с касания (класс .down — :active на iOS без touch-обработчика не срабатывает) и короткая вибрация.
+$('frame').addEventListener('pointerdown', (e) => { const b = e.target && e.target.closest ? e.target.closest('button') : null; if (!b || b.disabled) return; b.classList.add('down'); buzz(CFG.BTN_BUZZ_MS); });
+const btnUp = () => { for (const b of document.querySelectorAll('button.down')) b.classList.remove('down'); };
+['pointerup', 'pointercancel', 'blur'].forEach(t => window.addEventListener(t, btnUp));
 $('btn-menu').onclick = () => { Sound.init(); Sound.ui(); log('input', 'button', 'pause'); if (G.s && G.screen === 'game') goto('pause'); else if (G.s && G.screen === 'pause') goto('game'); };   // кнопка в шапке — пауза: Resume, Restart, How to play (меты нет — карты уровней в сборке нет)
 $('btn-mute').onclick = () => { G.save.muted = !G.save.muted; save(); hud(); Sound.init(); Sound.ui(); log('input', 'button', 'mute=' + G.save.muted); };
 
@@ -2313,10 +2393,11 @@ function drawRays(c, t){
 // Обледеневший провод — в ледяной корке с сосульками; провод с цветным патроном — скоба, патроны и силуэты ламп в его цвете.
 // drawAdBadge: значок «за рекламу» на холсте — тот же, что .ad на кнопках (жёлтая плашка, тёмный текст, тень снизу); x, y — центр
 function drawAdBadge(c, x, y){
-  const w = 22, h = 14;
-  c.save(); c.fillStyle = '#b86e12'; c.beginPath(); c.roundRect(x - w / 2, y - h / 2 + 1.2, w, h, 5); c.fill();
-  c.fillStyle = PAL.accent; c.beginPath(); c.roundRect(x - w / 2, y - h / 2, w, h, 5); c.fill();
-  c.fillStyle = '#3a2410'; c.font = '1000 9.5px Nunito, system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('AD', x, y + 0.6);
+  // значок ролика (аудит UI 17.11): белая плашка с тёмным ▶ — как на кнопках (.ad), без текста на поле
+  const w = 21, h = 16;
+  c.save(); c.fillStyle = 'rgba(0,0,0,.4)'; c.beginPath(); c.roundRect(x - w / 2, y - h / 2 + 1.6, w, h, 5); c.fill();
+  c.fillStyle = '#ffffff'; c.beginPath(); c.roundRect(x - w / 2, y - h / 2, w, h, 5); c.fill();
+  c.fillStyle = '#17142e'; c.beginPath(); c.moveTo(x - 3, y - 4.2); c.lineTo(x + 4.6, y); c.lineTo(x - 3, y + 4.2); c.closePath(); c.fill();
   c.restore();
 }
 function drawWire(c, g, t, ghost){
@@ -2325,10 +2406,10 @@ function drawWire(c, g, t, ghost){
   c.lineCap = 'round';
   if (ghost){
     const sp = (t - V.spareT) / dur(1600), spk = sp >= 0 && sp < 1 ? Math.sin(sp * Math.PI) : 0;      // первый показ запасного провода: блик
-    c.save(); c.globalAlpha = 0.34 + 0.1 * Math.sin(t / 500) + 0.55 * spk; c.setLineDash([5, 7]); c.strokeStyle = spk > 0.05 ? PAL.warm : PAL.muted; c.lineWidth = 2;
+    c.save(); c.globalAlpha = CFG.GHOST_A + 0.1 * Math.sin(t / 500) + 0.5 * spk; c.setLineDash([5, 7]); c.strokeStyle = spk > 0.05 ? PAL.warm : PAL.muted; c.lineWidth = 2;
     c.beginPath(); c.moveTo(x1, g.y); c.quadraticCurveTo(mx, my, xe, g.y); c.stroke(); c.setLineDash([]);
     const px = g.x0 + g.dir * g.len * 0.5, py = g.y + 22;
-    if (spk > 0){ const gx = g.x0 + g.dir * g.len * sp; glow(c, PAL.warm, gx, g.y + 4, 60, 0.7 * spk); glow(c, PAL.warm, px, py, 70, 0.45 * spk); c.globalAlpha = 0.34 + 0.6 * spk; }
+    if (spk > 0){ const gx = g.x0 + g.dir * g.len * sp; glow(c, PAL.warm, gx, g.y + 4, 60, 0.7 * spk); glow(c, PAL.warm, px, py, 70, 0.45 * spk); c.globalAlpha = CFG.GHOST_A + 0.5 * spk; }
     c.lineWidth = 2; c.beginPath(); c.arc(px, py, 12, 0, Math.PI * 2); c.stroke();
     c.lineWidth = 2.6; c.beginPath(); c.moveTo(px - 6, py); c.lineTo(px + 6, py); c.moveTo(px, py - 6); c.lineTo(px, py + 6); c.stroke();
     c.restore();
@@ -2400,8 +2481,8 @@ function drawTopWire(c){
   const N = G.s.colors * G.s.per + G.s.wild;
   c.lineCap = 'round'; c.strokeStyle = PAL.wire; c.lineWidth = 2.6;
   const ty = topY(); c.beginPath(); c.moveTo(0, ty); c.quadraticCurveTo(W / 2, ty + 2 * CFG.TOP_SAG, W, ty); c.stroke();
-  c.fillStyle = PAL.socket;
-  for (let q = V.top.length; q < N; q++){ const p = topPos(q); c.beginPath(); c.arc(p.x, p.y + 0.5, 2.2, 0, Math.PI * 2); c.fill(); }
+  // пустые патроны — сколько ламп ещё соберётся (аудит UI 17.11: были точки 2,2 px — прогресса не было видно)
+  for (let q = V.top.length; q < N; q++){ const p = topPos(q); c.fillStyle = CFG.TOP_SOCKET; c.beginPath(); c.roundRect(p.x - 3, p.y - 1.5, 6, 6, 2); c.fill(); c.fillStyle = 'rgba(255,255,255,.18)'; c.fillRect(p.x - 2, p.y - 0.6, 4, 1); }
 }
 // drawTube: колба варианта b — стекло, блик; собранная светится цветом и закрыта крышкой
 function drawTube(c, g, t, ghost){
