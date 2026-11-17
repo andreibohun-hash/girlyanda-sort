@@ -1632,8 +1632,10 @@ function skyLamps(seed){
     lamps.push({ x: (k + 0.25 + q() * 0.5) / cols, y: (r + 0.2 + q() * 0.6) / rows, z, ci: pal[Math.floor(q() * pal.length)], tilt: (q() - 0.5) * 0.5,
       first: 80 + q() * 1250, up: 140 + q() * 80, hold: 500 + q() * 900, down: 700 + q() * 700, gap: 500 + q() * 1800, sw: q() * 6.28, id: lamps.length });
   }
-  lamps.sort((a, b) => a.z - b.z);                             // дальние рисуются первыми
-  return lamps;
+  const keep = [];                                              // лампы не слипаются: ближе суммы полуширин (в px окна ~390×850) — вторую убираем
+  for (const L of lamps) if (keep.every(K => Math.hypot((L.x - K.x) * 390, (L.y - K.y) * 850) > 34 * (L.z + K.z))) keep.push(L);
+  keep.sort((a, b) => a.z - b.z);                              // дальние рисуются первыми
+  return keep;
 }
 // lampLight(L, u): яркость лампы 0…1 и момент последнего загорания (для щелчка-вспышки) — чистая функция времени от старта
 function lampLight(L, u){
