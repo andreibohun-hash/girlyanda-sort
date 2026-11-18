@@ -234,9 +234,9 @@ header,footer{transition:opacity .3s} #frame.focus header,#frame.focus footer{op
   <i id="sa"></i>
   <div id="game"><canvas id="cv"></canvas></div>
   <header>
-    <div class="hl"><button class="ib" id="btn-menu" aria-label="pause"><svg viewBox="0 0 24 24"><path d="M9 6v12M15 6v12"/></svg></button><button class="ib" id="btn-mute" aria-label="sound"><svg viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="wave" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/><path class="mutex" d="M16 9.5l5 5M21 9.5l-5 5"/></svg></button></div>
+    <div class="hl"><button class="ib" id="btn-mute" aria-label="sound"><svg viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="wave" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/><path class="mutex" d="M16 9.5l5 5M21 9.5l-5 5"/></svg></button></div>
     <span class="pill" id="hud-level">Level 1</span><span class="pill" id="hud-moves"><span class="lbl">moves </span><span id="hud-moves-n">0</span></span>
-    <div class="hr"></div>
+    <div class="hr"><button class="ib" id="btn-menu" aria-label="pause"><svg viewBox="0 0 24 24"><path d="M9 6v12M15 6v12"/></svg></button></div>   <!-- 18.11, Андрей: кнопка паузы с настройками — справа сверху -->
   </header>
   <footer>
     <button class="go" id="btn-undo"><svg viewBox="0 0 24 24"><path d="M9 6L4 11l5 5"/><path d="M4 11h10a6 6 0 0 1 0 12h-2"/></svg>Undo<i class="ad"></i></button>
@@ -1317,7 +1317,7 @@ const DEV = false;
 const TITLE = 'Twinkle Sort';                         // рабочее название (name-check 16.11: свободно в Play и App Store); финальное Андрей не выбрал — менять только здесь
 const API = TITLE.replace(/[^A-Za-z0-9]/g, '');       // window.TwinkleSort — пауза для обёртки
 const NAME = 'girlyanda-sort';                        // ключ сохранения: прогресс переживает смену названия
-const VERSION = '0.10.0';                              // видна в паузе: по ней плейтестер и мы понимаем, какая сборка открыта
+const VERSION = '0.10.1';                              // видна в паузе: по ней плейтестер и мы понимаем, какая сборка открыта
 const T0 = performance.now();
 let clockSkew = 0;                                    // drive() двигает игровые часы вперёд без ожидания
 let pauseAt = 0;                                      // момент паузы (фон, реклама, обёртка): пока стоит, игровые часы стоят на нём
